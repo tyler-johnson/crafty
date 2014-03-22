@@ -1,0 +1,29 @@
+<%
+var state = $craft.state,
+	hr = {
+		stopped: "Offline",
+		starting: "Offline",
+		running: "Online",
+		stopping: "Offline"
+	};
+%>
+
+<div class="server-info">
+	<div class="server-image-container">
+		<div class="server-image" style="background-image: url('http://minecraft-multiplayer.org/wp-content/uploads/2013/11/minecraft-adventure-online-multiplayer.jpg');"></div>
+	</div>
+	<div class="server-status">
+		<div class="server-status-inner">
+			<div class="server-status-color" data-state="<%= state %>" id="server-color"></div>
+			<span id="server-status"><%= hr[state] %></span>
+		</div>
+	</div>
+	<h2>MC Hammer</h2>
+	<div class="btn-group">
+		<% if (state === "stopped" || state === "starting") { %>
+		<a href="#" class="btn btn-sm btn-success btn-start<%= state === "starting" ? " disabled" : "" %>" x-bind="click: start"><%= state === "starting" ? "Starting..." : "Start" %></a>
+		<% } else if (state === "running" || state === "stopping") { %>
+		<a href="#" class="btn btn-sm btn-danger btn-stop<%= state === "stopping" ? " disabled" : "" %>" x-bind="click: stop"><%= state === "stopping" ? "Stopping..." : "Stop" %></a>
+		<% } %>
+	</div>
+</div>

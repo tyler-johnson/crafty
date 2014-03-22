@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+
+<html lang="en-US">
+	<head>
+		<meta charset="UTF-8" />
+		<title></title>
+		<!--[if lt IE 9]><script src="http://html5shim.googlecode.com/svn/trunk/html5.js"></script><![endif]-->
+		<% if (_.isArray($.styles) && $.styles.length) {
+			_.each($.styles, function(style) { %>
+		<link rel="stylesheet" href="<%= style %>" type="text/css" /><%
+		 	});
+		} %>
+		<% if (_.isArray($.scripts) && $.scripts.length) {
+			_.each($.scripts, function(script) { %>
+		<script type="text/javascript" src="<%= script %>"></script><%
+		 	});
+		} %>
+	</head>
+	<body>
+		<%= $.body %>
+	</body>
+</html>
