@@ -1,32 +1,44 @@
 // Load global dependencies
+window.app = require("./lib/app");
 window.jQuery = window.$ = require("jquery");
 require("./lib/backbone").$ = jQuery;
 require("./lib/bootstrap");
 window.View = require("./lib/view");
 window.socket = io.connect(location.origin);
+require("./lib/router");
 
 // create a singleton Craft instance
 var Craft = require("./lib/craft");
 window.$craft = new Craft();
 
-// and we're off
-var page = require("page"),
-	DataFeed = require("./views/data-feed");
+// wait on the dom
+$(document).ready(app.wait());
 
-page(function(ctx) {
-	var feed = new DataFeed({ el: "#main" });
-	feed.render();
+// load nav
+var nav;
+app.preroute(function(ctx, next) {
+	if (nav == null) {
+		nav = new View.TemplateView({
+			el: "#nav",
+			template: require("./templates/nav")
+		});
+	}
+
+	nav.render(ctx);
+	next();
 });
 
-$(document).ready(function() {
-	var SidebarView = require("./views/sidebar"),
-		sidebar, nav;
+app.route("/console", function(ctx) {
+	var DataFeed = require("./views/data-feed.js"),
+		view = new DataFeed();
 
-	sidebar = new SidebarView({ el: "#sidebar" });
+	$("#main").html(view.$el);
+	view.render();
+	ctx.on("close", view.close, view);
+});
+
+// load sidebar on start
+app.ready(function() {
+	var sidebar = new (require("./views/sidebar"))({ el: "#sidebar" });
 	sidebar.render();
-
-	// nav = new View.TemplateView({ el: "#nav", template: require("./templates/nav") })
-	// nav.render();
-
-	page();
 });

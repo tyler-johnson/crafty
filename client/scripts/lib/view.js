@@ -68,6 +68,13 @@ module.exports = Backbone.View.extend({
 		});
 
 		return this;
+	},
+
+	close: function() {
+		this.trigger("close");
+		this.remove();
+		this.off();
+		return this;
 	}
 
 });
@@ -88,8 +95,12 @@ function actionsParse(raw) {
 
 View.TemplateView = View.extend({
 	render: function(data) {
-		if (!_.contains([ "function", "string" ], typeof this.template))
-			throw new Error("Missing template.");
+		if (_.isString(this.template)) {
+			tpl = this.template;
+			this.template = function() { return tpl; }
+		}
+
+		if (!_.isFunction(this.template)) throw new Error("Missing template.");
 
 		this.$el.html(this.template(data));
 		this.delegateEvents();

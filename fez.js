@@ -5,7 +5,9 @@ var fez = require("fez"),
 	path = require("path"),
 	through = require("through"),
 	_ = require("underscore"),
-	mdeps = require("module-deps");
+	mdeps = require("module-deps"),
+	coffeeify = require("coffeeify"),
+	builtins = require("browser-builtins");
 
 var has = Object.hasOwnProperty.bind(Object);
 
@@ -43,8 +45,9 @@ fez(function(spec) {
 				var filename = path.resolve(__dirname, file.getFilename()),
 					deps = [],
 					dstream = mdeps(filename, {
-						transform: htmlr,
-						extensions: [ ".html", ".js", ".json" ]
+						modules: builtins,
+						transform: [ htmlr, coffeeify ],
+						extensions: [ ".js", ".json", ".coffee", ".html" ]
 					});
 
 				dstream.on("data", function(dep) {
@@ -60,10 +63,11 @@ fez(function(spec) {
 
 		spec.rule(files, secondary, 'client/dist/main.js', function(inputs) {
 			var b = browserify({
-				extensions: [ ".html" ]
+				extensions: [ ".html", ".coffee" ]
 			});
 
 			b.transform(htmlr);
+			b.transform(coffeeify);
 
 			inputs.forEach(function(input) {
 				b.add(input.getFilename());

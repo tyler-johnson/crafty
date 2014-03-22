@@ -6508,6 +6508,9 @@ body {
 main {
   margin-top: 30px;
 }
+#nav {
+  margin-bottom: 20px;
+}
 .server-info {
   margin: 0;
   text-align: center;

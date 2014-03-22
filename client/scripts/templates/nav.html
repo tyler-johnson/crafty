@@ -1,3 +1,8 @@
-  <li class="active"><a href="#">Home</a></li>
-  <li><a href="#">Profile</a></li>
-  <li><a href="#">Messages</a></li>
+<% function active(path) {
+    return $.pathname === path ? " class=\"active\"" : "";
+} %>
+
+<li<%= active("/settings") %>><a href="/settings"><i class="icon icon-cogs"></i> Settings</a></li>
+<li<%= active("/players") %>><a href="/players"><i class="icon icon-group"></i> Players</a></li>
+<li<%= active("/console") %>><a href="/console"><i class="icon icon-terminal"></i> Console</a></li>
+<li<%= active("/world") %>><a href="/world"><i class="icon icon-globe"></i> World</a></li>

@@ -1,18 +1,13 @@
 var _ = require("underscore"),
 	Backbone = require("backbone");
 
-module.exports = View.extend({
+module.exports = View.TemplateView.extend({
 	initialize: function() {
 		// bindings
 		$craft.bindObject(this);
 		this.on("craft:state", this.render);
 	},
 	template: require("../templates/info"),
-	render: function() {
-		this.$el.html(this.template());
-		this.delegateEvents();
-		return this;
-	},
 	actions: {
 		start: function(e) {
 			e.preventDefault();

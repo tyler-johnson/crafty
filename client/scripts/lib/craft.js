@@ -5,6 +5,7 @@ module.exports = (function() {
 
 	function Craft() {
 		this.state = null;
+		this.feed = [];
 
 		var stateChange = _.bind(this._stateChange, this);
 		this.listenTo(socket, "server:stateChange", stateChange);
@@ -19,6 +20,10 @@ module.exports = (function() {
 				args.unshift(event);
 				self.trigger.apply(self, args);
 			});
+		});
+
+		this.on("data", function(data) {
+			this.feed.push(data);
 		});
 	}
 

@@ -2,8 +2,6 @@ var _ = require("underscore");
 
 module.exports = View.TemplateView.extend({
 	initialize: function() {
-		this.feed = [];
-
 		// bindings
 		$craft.bindObject(this);
 		this.on("craft:data", this.push);
@@ -11,13 +9,13 @@ module.exports = View.TemplateView.extend({
 	},
 	template: require("../templates/data-feed.html"),
 	render: function() {
-		View.TemplateView.prototype.render.call(this, this.feed.join(""));
+		View.TemplateView.prototype.render.call(this, $craft.feed.join(""));
 		this.code = this.$el.find("code");
 		return this;
 	},
 	push: function(data) {
 		if (this.code != null) this.code.append(data);
-		return this.feed.push(data);
+		return this;
 	},
 	actions: {
 		submit: function(e) {
