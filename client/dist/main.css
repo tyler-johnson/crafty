@@ -6518,6 +6518,11 @@ main {
 fieldset {
   margin-bottom: 30px;
 }
+span.help-inline {
+  display: inline-block;
+  margin-left: 10px;
+  color: #555555;
+}
 .server-info {
   text-align: center;
   position: fixed;
