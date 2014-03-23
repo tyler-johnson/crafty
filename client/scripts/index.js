@@ -28,9 +28,20 @@ app.preroute(function(ctx, next) {
 	next();
 });
 
+// console route
 app.route("/console", function(ctx) {
-	var DataFeed = require("./views/data-feed.js"),
+	var DataFeed = require("./views/data-feed"),
 		view = new DataFeed();
+
+	$("#main").html(view.$el);
+	view.render();
+	ctx.on("close", view.close, view);
+});
+
+// settings route
+app.route("/settings", function(ctx) {
+	var SettingsView = require("./views/settings"),
+		view = new SettingsView();
 
 	$("#main").html(view.$el);
 	view.render();
@@ -39,6 +50,7 @@ app.route("/console", function(ctx) {
 
 // load sidebar on start
 app.ready(function() {
-	var sidebar = new (require("./views/sidebar"))({ el: "#sidebar" });
+	var sidebar = new (require("./views/sidebar"))();
+	$("#sidebar").append(sidebar.$el);
 	sidebar.render();
 });

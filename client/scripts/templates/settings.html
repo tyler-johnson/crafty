@@ -1,0 +1,94 @@
+<fieldset>
+	<legend>General</legend>
+
+	<div class="form-group">
+		<label class="control-label col-lg-2" for="inputName">Name</label>
+		<div class="col-lg-10">
+			<input type="text" class="form-control" id="inputName" name="name" />
+		</div>
+	</div>
+
+	<div class="form-group">
+		<label class="control-label col-lg-2" for="inputImage">Image URL</label>
+		<div class="col-lg-10">
+			<input type="text" class="form-control" id="inputImage" name="image" />
+		</div>
+	</div>
+
+	<div class="form-group">
+		<label class="control-label col-lg-2" for="selectVersion">Server Version</label>
+		<div class="col-lg-3">
+			<select name="version" id="selectVersion" class="form-control">
+				<option value="1.7.5">1.7.5</option>
+			</select>
+		</div>
+		<div class="col-lg-7">
+			<p class="help-block">If changed, the server executable will be replaced on the next launch.</p>
+		</div>
+	</div>
+</fieldset>
+
+<fieldset>
+	<legend>Game</legend>
+
+	<div class="form-group">
+		<label class="control-label col-lg-2" for="inputMOTD">Welcome Text</label>
+		<div class="col-lg-10">
+			<input type="text" class="form-control" id="inputMOTD" name="game.motd" />
+		</div>
+	</div>
+
+	<div class="form-group">
+		<label class="control-label col-lg-2" for="selectGameDifficulty">Difficulty</label>
+		<div class="col-lg-3">
+			<select name="game.difficulty" id="selectGameDifficulty" class="form-control">
+				<option value="0">Peaceful</option>
+				<option value="1">Easy</option>
+				<option value="2">Normal</option>
+				<option value="3">Hard</option>
+			</select>
+		</div>
+	</div>
+
+	<div class="form-group">
+		<label class="control-label col-lg-2" for="selectGameMode">Game Mode</label>
+		<div class="col-lg-3">
+			<select name="game.mode" id="selectGameMode" class="form-control">
+				<option value="0">Survival</option>
+				<option value="1">Creative</option>
+				<option value="2">Adventure</option>
+				<option value="3">Spectator</option>
+			</select>
+		</div>
+	</div>
+
+	<div class="form-group">
+		<label class="control-label col-lg-2" for="inputGameMaxPlayers">Max Players</label>
+		<div class="col-lg-3">
+			<input type="number" class="form-control" id="inputGameMaxPlayers" name="game.max-players" />
+		</div>
+	</div>
+
+	<div class="form-group">
+		<label class="control-label col-lg-2">Spawn</label>
+		<div class="col-lg-10">
+			<div class="checkbox">
+				<label><input type="checkbox"> Structures</label>
+				<label><input type="checkbox"> Animals</label>
+				<label><input type="checkbox"> Monsters</label>
+				<label><input type="checkbox"> NPCs</label>
+			</div>
+		</div>
+	</div>
+
+	<div class="form-group">
+		<label class="control-label col-lg-2">Misc</label>
+		<div class="col-lg-10">
+			<div class="checkbox">
+				<label><input type="checkbox"> Enable Flight</label>
+				<label><input type="checkbox"> Allow Nether Portals</label>
+				<label><input type="checkbox"> PVP</label>
+			</div>
+		</div>
+	</div>
+</fieldset>

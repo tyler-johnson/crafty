@@ -7,7 +7,8 @@ var fez = require("fez"),
 	_ = require("underscore"),
 	mdeps = require("module-deps"),
 	coffeeify = require("coffeeify"),
-	builtins = require("browser-builtins");
+	builtins = require("browser-builtins"),
+	uglify = require("fez-uglify");
 
 var has = Object.hasOwnProperty.bind(Object);
 
@@ -38,8 +39,8 @@ function lessParser(file) {
 	});
 }
 
-fez(function(spec) {
-	spec.with("./client/scripts/index.js").one(function(files) {
+exports.build = function(spec) {
+	spec.with("client/scripts/index.js").one(function(files) {
 		var secondary = files.map(function(file) {
 			return new Promise(function(resolve, reject) {
 				var filename = path.resolve(__dirname, file.getFilename()),
@@ -70,7 +71,7 @@ fez(function(spec) {
 			b.transform(coffeeify);
 
 			inputs.forEach(function(input) {
-				b.add(input.getFilename());
+				b.add(path.resolve(__dirname, input.getFilename()));
 			});
 
 			var resolver = Promise.defer();
@@ -79,7 +80,11 @@ fez(function(spec) {
 		});
 	});
 
-	spec.with("./client/styles/main.less").one(function(files) {
+	// spec.with("client/dist/*.js").each(function(file) {
+	// 	spec.rule(file, file.patsubst("client/dist/%.js", "client/dist/%.min.js"), uglify());
+	// });
+
+	spec.with("client/styles/main.less").one(function(files) {
 		var secondary = files.map(function(file) {
 			var parser = lessParser(file);
 
@@ -126,4 +131,7 @@ fez(function(spec) {
 				});
 		});
 	});
-});
+}
+
+exports.default = exports.build;
+fez(module);

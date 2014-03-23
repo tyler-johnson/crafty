@@ -6509,7 +6509,14 @@ main {
   margin: 30px 0;
 }
 #nav {
-  margin-bottom: 20px;
+  margin-bottom: 30px;
+}
+.radio label,
+.checkbox label {
+  display: block;
+}
+fieldset {
+  margin-bottom: 30px;
 }
 .server-info {
   text-align: center;

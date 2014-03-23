@@ -2,21 +2,12 @@ _ = require "underscore"
 path = require "path"
 {Events} = require "backbone"
 
-# get a copy of package.json to keep things DRY
-pkg = require("../../../package.json");
-
 # set up the app
 module.exports =
 app =
 	# app state
 	state: "init"
 	initTimer: new Date # date cache for the *rough* time of launch
-
-	# app environment
-	dir: process.cwd()
-	env: process.env.NODE_ENV
-	version: pkg.version
-	name: pkg.name
 
 	# init defers a call to start
 	init: () -> _.defer @wait()
@@ -61,6 +52,10 @@ app =
 
 # attach events
 _.extend app, Events
+
+# attach runtime
+if (_.isObject(__app_runtime_variables__))
+	_.extend(app, __app_runtime_variables__);
 
 # init app
 app.init()
