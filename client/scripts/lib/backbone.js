@@ -7,17 +7,17 @@ Backbone.Events.bindObject = function(obj, ns) {
 
 	this.unbindObject(obj);
 
-	obj.listenTo(this, "all", function() {
+	this.listenTo(obj, "all", _.bind(function() {
 		var args = _.toArray(arguments);
 		args[0] = ns + args[0];
-		obj.trigger.apply(obj, args);
-	});
+		this.trigger.apply(this, args);
+	}, this));
 
 	return this;
 }
 
 Backbone.Events.unbindObject = function(obj) {
-	obj.stopListening(this, "all");
+	this.stopListening(obj, "all");
 	return this;
 }
 

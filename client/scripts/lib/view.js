@@ -75,7 +75,11 @@ module.exports = Backbone.View.extend({
 		this.remove();
 		this.off();
 		return this;
-	}
+	},
+
+	// special event methods must be copied on
+	bindObject: Backbone.Events.bindObject,
+	unbindObject: Backbone.Events.unbindObject
 
 });
 

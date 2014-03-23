@@ -49,11 +49,6 @@ module.exports = (function() {
 		this.trigger("state", state);
 	}
 
-	Craft.prototype.bindObject = function(obj, ns) {
-		if (ns == null) ns = "craft";
-		return Events.bindObject.call(this, obj, ns);
-	}
-
 	return Craft;
 
 })();

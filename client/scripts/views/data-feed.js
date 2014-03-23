@@ -3,7 +3,7 @@ var _ = require("underscore");
 module.exports = View.TemplateView.extend({
 	initialize: function() {
 		// bindings
-		$craft.bindObject(this);
+		this.bindObject($craft, "craft");
 		this.on("craft:data", this.push);
 		this.on("craft:state", this.render);
 	},
