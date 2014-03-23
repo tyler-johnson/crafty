@@ -39,5 +39,8 @@ var mandatory = { env: env };
 if (_.isNumber(argv.port)) mandatory.port = argv.port;
 conf.load(mandatory);
 
+// validate config
+conf.validate();
+
 // and launch
 require("../lib/");

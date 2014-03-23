@@ -24,7 +24,8 @@
 		"jquery": "2.1.0",
 		"backbone": "1.1.2",
 		"minimist": "0.0.8",
-		"convict": "0.4.2"
+		"convict": "0.4.2",
+		"properties-parser": "0.1.1"
 	},
 	"devDependencies": {
 		"fez": "1.0.8",
