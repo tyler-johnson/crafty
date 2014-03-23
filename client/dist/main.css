@@ -6506,15 +6506,15 @@ body {
   color: #222222;
 }
 main {
-  margin-top: 30px;
+  margin: 30px 0;
 }
 #nav {
   margin-bottom: 20px;
 }
 .server-info {
-  margin: 0;
   text-align: center;
   position: fixed;
+  width: 262.5px;
 }
 .server-info .server-image-container {
   width: 160px;

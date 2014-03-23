@@ -1,0 +1,43 @@
+#!/usr/bin/env node
+
+var fs = require("fs"),
+	path = require("path"),
+	_ = require("underscore");
+
+var argv = require('minimist')(process.argv.slice(2), {
+	string: [ "config" ],
+	boolean: [ "development" ],
+	alias: {
+		"p": "port",
+		"c": "config"
+	},
+	default: {
+		development: true
+	}
+});
+
+// Set the env
+if (process.env.NODE_ENV == null) process.env.NODE_ENV = "production";
+if (argv.development) process.env.NODE_ENV = "development";
+var env = process.env.NODE_ENV;
+
+// load config
+var conf = require("../lib/config"),
+	configFiles = _.compact([ argv.config, "crafty.json", "crafty.js" ]);
+
+// find the config file
+_.some(configFiles, function(filename) {
+	var configFile = path.resolve(process.cwd(), filename);
+	if (!fs.existsSync(configFile)) return;
+
+	if (path.extname(configFile) === ".json") conf.loadFile(configFile);
+	else conf.load(require(configFile));
+});
+
+// load mandatory config
+var mandatory = { env: env };
+if (_.isNumber(argv.port)) mandatory.port = argv.port;
+conf.load(mandatory);
+
+// and launch
+require("../lib/");

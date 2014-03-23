@@ -59,15 +59,6 @@ app =
 
 		return @ # chaining
 
-	# convenience method for turning a relative path into an absolute path
-	path: (args...) ->
-		args = _.compact _.flatten args
-		args.unshift @dir
-		path.resolve.apply path, args
-
-	# convenience method for turning an absolute path into a relative path
-	relative: (to, lead = false) -> (if lead then "/" else "") + path.relative @dir, to
-
 # attach events
 _.extend app, Events
 
