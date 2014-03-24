@@ -1,6 +1,7 @@
 // Load global dependencies
 window.app = require("./lib/app");
 window.jQuery = window.$ = require("jquery");
+require("./lib/jquery_extras");
 require("./lib/backbone").$ = jQuery;
 require("./lib/bootstrap");
 window.View = require("./lib/view");

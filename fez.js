@@ -80,7 +80,7 @@ exports.build = function(spec) {
 		});
 	});
 
-	// spec.with("client/dist/*.js").each(function(file) {
+	// spec.with("client/dist/*.js").not('client/dist/*.min.js').each(function(file) {
 	// 	spec.rule(file, file.patsubst("client/dist/%.js", "client/dist/%.min.js"), uglify());
 	// });
 

@@ -36,7 +36,7 @@
 	<div class="form-group">
 		<label class="control-label col-lg-2" for="inputMOTD">Welcome Text</label>
 		<div class="col-lg-9">
-			<input type="text" class="form-control" id="inputMOTD" name="game.motd" maxlength="59" />
+			<input type="text" class="form-control" id="inputMOTD" name="game[motd]" maxlength="59" />
 		</div>
 		<div class="col-lg-1">
 			<p class="help-block">0 / 59</p>
@@ -46,7 +46,7 @@
 	<div class="form-group">
 		<label class="control-label col-lg-2" for="selectGameDifficulty">Difficulty</label>
 		<div class="col-lg-3">
-			<select name="game.difficulty" id="selectGameDifficulty" class="form-control">
+			<select name="game[difficulty]" id="selectGameDifficulty" class="form-control">
 				<option value="0">Peaceful</option>
 				<option value="1">Easy</option>
 				<option value="2">Normal</option>
@@ -58,7 +58,7 @@
 	<div class="form-group">
 		<label class="control-label col-lg-2" for="selectGameMode">Game Mode</label>
 		<div class="col-lg-3">
-			<select name="game.gamemode" id="selectGameMode" class="form-control">
+			<select name="game[gamemode]" id="selectGameMode" class="form-control">
 				<option value="0">Survival</option>
 				<option value="1">Creative</option>
 				<option value="2">Adventure</option>
@@ -70,7 +70,7 @@
 	<div class="form-group">
 		<label class="control-label col-lg-2" for="inputGameMaxPlayers">Max Players</label>
 		<div class="col-lg-3">
-			<input type="number" class="form-control" id="inputGameMaxPlayers" name="game.max-players" />
+			<input type="number" class="form-control" id="inputGameMaxPlayers" name="game[max-players]" />
 		</div>
 	</div>
 
@@ -78,10 +78,10 @@
 		<label class="control-label col-lg-2">Spawn</label>
 		<div class="col-lg-10">
 			<div class="checkbox">
-				<label><input name="game.generate-structures" type="checkbox"> Structures</label>
-				<label><input name="game.spawn-animals" type="checkbox"> Animals</label>
-				<label><input name="game.spawn-monsters" type="checkbox"> Monsters</label>
-				<label><input name="game.spawn-npcs" type="checkbox"> NPCs</label>
+				<label><input name="game[generate-structures]" type="checkbox"> Structures</label>
+				<label><input name="game[spawn-animals]" type="checkbox"> Animals</label>
+				<label><input name="game[spawn-monsters]" type="checkbox"> Monsters</label>
+				<label><input name="game[spawn-npcs]" type="checkbox"> NPCs</label>
 			</div>
 		</div>
 	</div>
@@ -90,9 +90,9 @@
 		<label class="control-label col-lg-2">Misc</label>
 		<div class="col-lg-10">
 			<div class="checkbox">
-				<label><input name="game.allow-flight" type="checkbox"> Enable Flight</label>
-				<label><input name="game.allow-nether" type="checkbox"> Allow Nether Portals</label>
-				<label><input name="game.pvp" type="checkbox"> PVP</label>
+				<label><input name="game[allow-flight]" type="checkbox"> Enable Flight</label>
+				<label><input name="game[allow-nether]" type="checkbox"> Allow Nether Portals</label>
+				<label><input name="game[pvp]" type="checkbox"> PVP</label>
 			</div>
 		</div>
 	</div>
@@ -102,8 +102,8 @@
 	<hr/>
 	<div class="form-group">
 		<div class="col-lg-10 col-lg-offset-2">
-			<a href="#" class="btn btn-success">Save</a>
-			<a href="#" class="btn btn-primary">Save &amp; Restart</a>
+			<a href="#" class="btn btn-success" x-bind="click: save">Save</a>
+			<a href="#" class="btn btn-primary" x-bind="click: save-restart">Save &amp; Restart</a>
 			<span class="help-inline">Server must be restarted for changes to take effect.</span>
 		</div>
 	</div>
