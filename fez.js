@@ -8,7 +8,8 @@ var fez = require("fez"),
 	mdeps = require("module-deps"),
 	coffeeify = require("coffeeify"),
 	builtins = require("browser-builtins"),
-	uglify = require("fez-uglify");
+	uglify = require("fez-uglify"),
+	Ractive = require("ractive");
 
 var has = Object.hasOwnProperty.bind(Object);
 
@@ -22,8 +23,8 @@ function htmlr(file) {
 	function end () {
 		var tpl, src;
 		try {
-			tpl = _.template(data, null, { variable: "$" });
-			src = "var _ = require(\"underscore\");\nmodule.exports = (" + tpl.source + ");";
+			tpl = Ractive.parse(data);
+			src = "var _ = require(\"underscore\");\nmodule.exports = (" + JSON.stringify(tpl) + ");";
 		} catch (error) {
 			this.emit('error', error);
 		}

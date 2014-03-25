@@ -1,36 +1,46 @@
 var _ = require("underscore");
 
-module.exports = View.TemplateView.extend({
-	initialize: function() {
-		// bindings
-		this.bindObject($craft, "craft");
-		this.on("craft:state", this.render);
-	},
-	template: require("../templates/info"),
-	actions: {
-		start: function(e) {
-			e.preventDefault();
-			$craft.start();
-		},
-		stop: function(e) {
-			if (this.stopInterval != null) return;
-
-			var cnt = 3, i,
-				el = $(e.currentTarget);
-
-			e.preventDefault();
-			$craft.stop(cnt);
-			el.addClass("disabled").text("in " + cnt + "...");
-
-			this.stopInterval =
-			i = setInterval(_.bind(function() {
-				cnt--;
-				if (cnt > 0) el.text("in " + cnt + "...");
-				else {
-					clearInterval(i);
-					this.stopInterval = null;
-				}
-			}, this), 1000);
+var sidebar =
+module.exports = new Ractive({
+	el: "#sidebar",
+	data: {
+		state: $craft.state,
+		humanState: {
+			stopped: "Offline",
+			starting: "Offline",
+			running: "Online",
+			stopping: "Offline"
 		}
-	}
+	},
+	template: require("../templates/info")
+});
+
+$craft.on("state", function(state) {
+	sidebar.set("state", state);
+});
+
+sidebar.on("start", function(e) {
+	e.original.preventDefault();
+	$craft.start();
+});
+
+sidebar.on("stop", function(e) {
+	e.original.preventDefault();
+
+	if (this.counting) return;
+	this.counting = true;
+
+	var cnt = 3, i;
+	$craft.stop(cnt);
+	e.node.classList.add("disabled");
+	e.node.innerText = "in " + cnt + "...";
+
+	i = setInterval(_.bind(function() {
+		cnt--;
+		if (cnt > 0) e.node.innerText = "in " + cnt + "...";
+		else {
+			clearInterval(i);
+			this.counting = false;
+		}
+	}, this), 1000);
 });

@@ -3,17 +3,11 @@ var _ = require("underscore");
 var BOOL_PROPS = [ "generate-structures", "spawn-animals", "spawn-monsters", "spawn-npcs", "allow-flight", "allow-nether", "pvp" ],
 	NUM_PROPS = [ "difficulty", "gamemode", "max-players" ];
 
-module.exports = View.TemplateView.extend({
-	initialize: function() {
-
-	},
-	tagName: "form",
-	className: "form-horizontal",
-	template: require("../templates/settings"),
-	events: {
-		submit: function(e) {
-			e.preventDefault();
-			var data = $(e.target).serializeObject();
+module.exports = Ractive.extend({
+	init: function() {
+		this.on("submit", function(e) {
+			if (e.original != null) e.original.preventDefault();
+			var data = $(e.node).serializeObject();
 
 			_.each(BOOL_PROPS, function(k) {
 				if (_.isEmpty(data.game[k])) data.game[k] = false;
@@ -27,14 +21,19 @@ module.exports = View.TemplateView.extend({
 			});
 
 			console.log(data);
-		}
-	},
-	actions: {
-		save: function(e) {
-			this.$el.submit();
-		},
-		"save-restart": function(e) {
+		});
 
-		}
+		this.on("save", function(e) {
+			e.original.preventDefault();
+			this.fire("submit", { node: this.find("form") });
+		});
+
+		this.on("save-restart", function(e) {});
+	},
+	el: "#main",
+	append: true,
+	template: require("../templates/settings"),
+	data: {
+		mcversions: app.minecraft_versions.slice(0).reverse()
 	}
 });

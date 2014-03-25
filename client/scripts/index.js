@@ -4,9 +4,10 @@ window.jQuery = window.$ = require("jquery");
 require("./lib/jquery_extras");
 require("./lib/backbone").$ = jQuery;
 require("./lib/bootstrap");
-window.View = require("./lib/view");
+// window.View = require("./lib/view");
 window.socket = io.connect(location.origin);
 require("./lib/router");
+require("Ractive"); // ractive is global apparently
 
 // create a singleton Craft instance
 var Craft = require("./lib/craft");
@@ -19,39 +20,34 @@ $(document).ready(app.wait());
 var nav;
 app.preroute(function(ctx, next) {
 	if (nav == null) {
-		nav = new View.TemplateView({
+		nav = new Ractive({
 			el: "#nav",
-			template: require("./templates/nav")
+			template: require("./templates/nav"),
+			data: {
+				active: function(path) {
+				    return this.get("pathname") === path ? " active" : "";
+				}
+			}
 		});
 	}
 
-	nav.render(ctx);
+	nav.set("pathname", ctx.pathname);
 	next();
 });
 
 // console route
 app.route("/console", function(ctx) {
-	var DataFeed = require("./views/data-feed"),
-		view = new DataFeed();
-
-	$("#main").html(view.$el);
-	view.render();
-	ctx.on("close", view.close, view);
+	var view = new (require("./views/data-feed"))();
+	ctx.on("close", view.teardown, view);
 });
 
 // settings route
 app.route("/settings", function(ctx) {
-	var SettingsView = require("./views/settings"),
-		view = new SettingsView();
-
-	$("#main").html(view.$el);
-	view.render();
-	ctx.on("close", view.close, view);
+	var view = new (require("./views/settings"))();
+	ctx.on("close", view.teardown, view);
 });
 
 // load sidebar on start
 app.ready(function() {
-	var sidebar = new (require("./views/sidebar"))();
-	$("#sidebar").append(sidebar.$el);
-	sidebar.render();
+	require("./views/sidebar");
 });
