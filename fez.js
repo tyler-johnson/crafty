@@ -42,6 +42,7 @@ function lessParser(file) {
 
 exports.build = function(spec) {
 	spec.with("client/scripts/index.js").one(function(files) {
+		var cache = {};
 		var secondary = files.map(function(file) {
 			return new Promise(function(resolve, reject) {
 				var filename = path.resolve(__dirname, file.getFilename()),
@@ -53,6 +54,7 @@ exports.build = function(spec) {
 					});
 
 				dstream.on("data", function(dep) {
+					cache[dep.id] = dep;
 					if (!dep.entry) deps.push(path.relative(__dirname, dep.id));
 				});
 
@@ -76,7 +78,7 @@ exports.build = function(spec) {
 			});
 
 			var resolver = Promise.defer();
-			b.bundle({ debug: true }, resolver.callback);
+			b.bundle({ debug: true, cache: cache }, resolver.callback);
 			return resolver.promise;
 		});
 	});
