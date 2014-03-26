@@ -16,11 +16,21 @@ module.exports = Ractive.extend({
 
 			_.each(NUM_PROPS, function(k) {
 				var val = parseFloat(data.game[k], 10);
-				if (isNaN(val)) val = 0;
-				data.game[k] = val;
+				data.game[k] = isNaN(val) ? 0 : val;
 			});
 
-			console.log(data);
+			// two level deep merge
+			var props = $craft.prop();
+			_.each(data, function(val, key) {
+				if (_.isObject(val)) {
+					var cur = _.isObject(props[key]) ? props[key] : {};
+					val = _.extend(cur, val);
+				}
+				props[key] = val;
+			});
+
+			// save props
+			$craft.prop(null, props);
 		});
 
 		this.on("save", function(e) {
@@ -29,11 +39,20 @@ module.exports = Ractive.extend({
 		});
 
 		this.on("save-restart", function(e) {});
+
+		function onPropChange() { this.set("props", $craft.prop()); }
+		$craft.on("prop", onPropChange, this);
+
+		this.on("teardown", function() {
+			$craft.off("prop", onPropChange);
+		});
 	},
 	el: "#main",
 	append: true,
+	twoway: false,
 	template: require("../templates/settings"),
 	data: {
-		mcversions: app.minecraft_versions.slice(0).reverse()
+		mcversions: app.minecraft_versions.slice(0).reverse(),
+		props: $craft.prop()
 	}
 });

@@ -21,6 +21,9 @@ $craft.on("state", function(state) {
 
 sidebar.on("start", function(e) {
 	e.original.preventDefault();
+	if (e.node.classList.contains("disabled")) return;
+	e.node.classList.add("disabled");
+	e.node.innerText = "Setting up...";
 	$craft.start();
 });
 

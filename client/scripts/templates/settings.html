@@ -5,21 +5,21 @@
 		<div class="form-group">
 			<label class="control-label col-lg-2" for="inputName">Name</label>
 			<div class="col-lg-10">
-				<input type="text" class="form-control" id="inputName" name="name" />
+				<input type="text" class="form-control" id="inputName" name="server[name]" value="{{ props.server.name }}" />
 			</div>
 		</div>
 
 		<div class="form-group">
 			<label class="control-label col-lg-2" for="inputImage">Image URL</label>
 			<div class="col-lg-10">
-				<input type="text" class="form-control" id="inputImage" name="image" />
+				<input type="text" class="form-control" id="inputImage" name="server[image]" value="{{ props.server.image }}" />
 			</div>
 		</div>
 
 		<div class="form-group">
 			<label class="control-label col-lg-2" for="selectVersion">Minecraft Version</label>
 			<div class="col-lg-3">
-				<select name="version" id="selectVersion" class="form-control">
+				<select name="server[version]" value="{{ props.server.version }}" id="selectVersion" class="form-control">
 					{{#mcversions}}
 					<option value="{{ this }}">{{ this }}</option>
 					{{/mcversions}}
@@ -37,7 +37,7 @@
 		<div class="form-group">
 			<label class="control-label col-lg-2" for="inputMOTD">Welcome Text</label>
 			<div class="col-lg-9">
-				<input type="text" class="form-control" id="inputMOTD" name="game[motd]" maxlength="59" />
+				<input type="text" class="form-control" id="inputMOTD" maxlength="59" name="game[motd]" value="{{ props.game.motd }}" />
 			</div>
 			<div class="col-lg-1">
 				<p class="help-block">0 / 59</p>
@@ -47,7 +47,7 @@
 		<div class="form-group">
 			<label class="control-label col-lg-2" for="selectGameDifficulty">Difficulty</label>
 			<div class="col-lg-3">
-				<select name="game[difficulty]" id="selectGameDifficulty" class="form-control">
+				<select name="game[difficulty]" value="{{ props.game.difficulty }}" id="selectGameDifficulty" class="form-control">
 					<option value="0">Peaceful</option>
 					<option value="1">Easy</option>
 					<option value="2">Normal</option>
@@ -59,7 +59,7 @@
 		<div class="form-group">
 			<label class="control-label col-lg-2" for="selectGameMode">Game Mode</label>
 			<div class="col-lg-3">
-				<select name="game[gamemode]" id="selectGameMode" class="form-control">
+				<select name="game[gamemode]" value="{{ props.game.gamemode }}" id="selectGameMode" class="form-control">
 					<option value="0">Survival</option>
 					<option value="1">Creative</option>
 					<option value="2">Adventure</option>
@@ -71,7 +71,7 @@
 		<div class="form-group">
 			<label class="control-label col-lg-2" for="inputGameMaxPlayers">Max Players</label>
 			<div class="col-lg-3">
-				<input type="number" class="form-control" id="inputGameMaxPlayers" name="game[max-players]" />
+				<input type="number" class="form-control" id="inputGameMaxPlayers" name="game[max-players]" value="{{ props.game["max-players"] }}" />
 			</div>
 		</div>
 
@@ -79,10 +79,10 @@
 			<label class="control-label col-lg-2">Spawn</label>
 			<div class="col-lg-10">
 				<div class="checkbox">
-					<label><input name="game[generate-structures]" type="checkbox"> Structures</label>
-					<label><input name="game[spawn-animals]" type="checkbox"> Animals</label>
-					<label><input name="game[spawn-monsters]" type="checkbox"> Monsters</label>
-					<label><input name="game[spawn-npcs]" type="checkbox"> NPCs</label>
+					<label><input name="game[generate-structures]" checked="{{ props.game["generate-structures"] }}" type="checkbox" /> Structures</label>
+					<label><input name="game[spawn-animals]" checked="{{ props.game["spawn-animals"] }}" type="checkbox" /> Animals</label>
+					<label><input name="game[spawn-monsters]" checked="{{ props.game["spawn-monsters"] }}" type="checkbox" /> Monsters</label>
+					<label><input name="game[spawn-npcs]" checked="{{ props.game["spawn-npcs"] }}" type="checkbox" /> NPCs</label>
 				</div>
 			</div>
 		</div>
@@ -91,9 +91,9 @@
 			<label class="control-label col-lg-2">Misc</label>
 			<div class="col-lg-10">
 				<div class="checkbox">
-					<label><input name="game[allow-flight]" type="checkbox"> Enable Flight</label>
-					<label><input name="game[allow-nether]" type="checkbox"> Allow Nether Portals</label>
-					<label><input name="game[pvp]" type="checkbox"> PVP</label>
+					<label><input name="game[allow-flight]" checked="{{ props.game["allow-flight"] }}" type="checkbox" /> Enable Flight</label>
+					<label><input name="game[allow-nether]" checked="{{ props.game["allow-nether"] }}" type="checkbox" /> Allow Nether Portals</label>
+					<label><input name="game[pvp]" checked="{{ props.game["pvp"] }}" type="checkbox" /> PVP</label>
 				</div>
 			</div>
 		</div>
@@ -103,7 +103,7 @@
 		<hr/>
 		<div class="form-group">
 			<div class="col-lg-10 col-lg-offset-2">
-				<a href="#" class="btn btn-success" on-click="save">Save</a>
+				<button type="submit" class="btn btn-success">Save</button>
 				<a href="#" class="btn btn-primary" on-click="save-restart">Save &amp; Restart</a>
 				<span class="help-inline">Server must be restarted for changes to take effect.</span>
 			</div>

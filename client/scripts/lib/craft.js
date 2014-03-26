@@ -1,5 +1,6 @@
 var Events = require("backbone").Events,
-	_ = require("underscore");
+	_ = require("underscore"),
+	Promise = require("bluebird");
 
 module.exports = (function() {
 
@@ -25,6 +26,10 @@ module.exports = (function() {
 		this.on("data", function(data) {
 			this.feed.push(data);
 		});
+
+		// Load props once on start up
+		this.props = {};
+		this._loadProps();
 	}
 
 	// eventful
@@ -47,6 +52,26 @@ module.exports = (function() {
 	Craft.prototype._stateChange = function(state) {
 		this.state = state;
 		this.trigger("state", state);
+	}
+
+	Craft.prototype.prop = function(key, val, cb) {
+		if (val === void 0) return app.util.getProps(this.props, key);
+		
+		app.util.setProps(this.props, key, val);
+		this.trigger("prop", key, val);
+		return cb !== false ? this._writeProps().nodeify(cb) : true;
+	}
+
+	Craft.prototype._loadProps = function() {
+		return app.util.asyncSocketEvent(socket, "props")
+			.bind(this)
+			.then(function(data) {
+				this.prop(null, data, false);
+			});
+	}
+
+	Craft.prototype._writeProps = function() {
+		return app.util.asyncSocketEvent(socket, "props", this.props);
 	}
 
 	return Craft;
