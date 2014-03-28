@@ -4,6 +4,7 @@ var sidebar =
 module.exports = new Ractive({
 	el: "#sidebar",
 	data: {
+		props: $craft.props,
 		state: $craft.state,
 		humanState: {
 			stopped: "Offline",
@@ -12,7 +13,8 @@ module.exports = new Ractive({
 			stopping: "Offline"
 		}
 	},
-	template: require("../templates/info")
+	template: require("../templates/info"),
+	adapt: [ 'Backbone' ]
 });
 
 $craft.on("state", function(state) {

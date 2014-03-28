@@ -5,6 +5,26 @@ var BOOL_PROPS = [ "generate-structures", "spawn-animals", "spawn-monsters", "sp
 
 module.exports = Ractive.extend({
 	init: function() {
+		this.set("props", $craft.props);
+
+		this.on("save:enter", function() {
+			this.findAll(".btn").forEach(function(btn) {
+				btn.setAttribute("disabled", true);
+				btn.classList.add("disabled");
+			});
+
+			this.find("button[type=\"submit\"]").innerHTML = "<i class=\"icon icon-cog icon-spin\"></i> Saving";
+		});
+
+		this.on("save:leave", function() {
+			this.findAll(".btn").forEach(function(btn) {
+				btn.removeAttribute("disabled");
+				btn.classList.remove("disabled");
+			});
+
+			this.find("button[type=\"submit\"]").innerHTML = "Save";
+		});
+
 		this.on("submit", function(e) {
 			if (e.original != null) e.original.preventDefault();
 			var data = $(e.node).serializeObject();
@@ -20,17 +40,19 @@ module.exports = Ractive.extend({
 			});
 
 			// two level deep merge
-			var props = $craft.prop();
-			_.each(data, function(val, key) {
-				if (_.isObject(val)) {
-					var cur = _.isObject(props[key]) ? props[key] : {};
-					val = _.extend(cur, val);
+			_.each(data, _.bind(function(val, key) {
+				var cur = this.get("props." + key);
+
+				if (_.isObject(val) && _.isObject(cur)) {
+					val = _.extend({}, cur, val);
 				}
-				props[key] = val;
-			});
+
+				this.set("props." + key, val);
+			}, this));
 
 			// save props
-			$craft.prop(null, props);
+			this.fire("save:enter");
+			$craft.props.save().finally(this.fire.bind(this, "save:leave"));
 		});
 
 		this.on("save", function(e) {
@@ -39,20 +61,13 @@ module.exports = Ractive.extend({
 		});
 
 		this.on("save-restart", function(e) {});
-
-		function onPropChange() { this.set("props", $craft.prop()); }
-		$craft.on("prop", onPropChange, this);
-
-		this.on("teardown", function() {
-			$craft.off("prop", onPropChange);
-		});
 	},
 	el: "#main",
 	append: true,
 	twoway: false,
 	template: require("../templates/settings"),
 	data: {
-		mcversions: app.minecraft_versions.slice(0).reverse(),
-		props: $craft.prop()
-	}
+		mcversions: app.minecraft_versions.slice(0).reverse()
+	},
+	adapt: [ 'Backbone' ]
 });

@@ -1,6 +1,6 @@
 <div class="server-info">
 	<div class="server-image-container">
-		<div class="server-image" style="background-image: url('http://minecraft-multiplayer.org/wp-content/uploads/2013/11/minecraft-adventure-online-multiplayer.jpg');"></div>
+		<div class="server-image" style="background-image: url('{{ props.server.image }}');"></div>
 	</div>
 	<div class="server-status">
 		<div class="server-status-inner">
@@ -8,7 +8,7 @@
 			<span id="server-status">{{ humanState[state] }}</span>
 		</div>
 	</div>
-	<h2>MC Hammer</h2>
+	<h2>{{ props.server.name }}</h2>
 	<div class="btn-group">
 		{{# state === "stopped" }}
 		<a href="#" class="btn btn-sm btn-success btn-start" on-click="start">Start</a>

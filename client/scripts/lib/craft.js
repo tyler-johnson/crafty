@@ -1,4 +1,4 @@
-var Events = require("backbone").Events,
+var Backbone = require("backbone"),
 	_ = require("underscore"),
 	Promise = require("bluebird");
 
@@ -28,12 +28,11 @@ function Craft() {
 	});
 
 	// Load props once on start up
-	this.props = {};
-	this._loadProps();
+	this.props = new Properties();
 }
 
 // eventful
-Craft.prototype = Object.create(Events);
+Craft.prototype = Object.create(Backbone.Events);
 
 Craft.prototype.start = function() {
 	socket.emit("server:start");
@@ -54,22 +53,45 @@ Craft.prototype._stateChange = function(state) {
 	this.trigger("state", state);
 }
 
-Craft.prototype.prop = function(key, val, cb) {
-	if (val === void 0) return app.util.getProps(this.props, key);
-	
-	app.util.setProps(this.props, key, val);
-	this.trigger("prop", key, val);
-	return cb !== false ? this._writeProps().nodeify(cb) : true;
-}
+// server properties
+var Properties = Backbone.Model.extend({
+	initialize: function() {
+		this.listenTo(socket, "props", this.set.bind(this));
+		this.listenTo(socket, "reconnect", this.fetch.bind(this, null));
+		this.fetch();
+	},
+	isNew: function() {
+		return false;
+	},
+	sync: function(method, model, options) {
+		if (options == null) options = {};
+		if (!_.isFunction(options.success)) options.success = noop;
+		if (!_.isFunction(options.error)) options.error = noop;
 
-Craft.prototype._loadProps = function() {
-	return app.util.asyncSocketEvent(socket, "props")
-		.bind(this)
-		.then(function(data) {
-			this.prop(null, data, false);
+		var promise = new Promise(function(resolve, reject) {
+			switch (method) {
+				case "read":
+					socket.emit("props", resolve);
+					break;
+
+				case "create":
+					reject(new Error("Cannot create props."));
+					break;
+
+				case "update":
+					socket.emit("props", model.toJSON(), resolve);
+					break
+
+				case "delete":
+					reject(new Error("Cannot delete props."));
+					break;
+			}
 		});
-}
 
-Craft.prototype._writeProps = function() {
-	return app.util.asyncSocketEvent(socket, "props", this.props);
-}
+		promise.then(options.success, options.error);
+		model.trigger('request', model, promise, options);
+		return promise;
+	}
+});
+
+function noop(){}

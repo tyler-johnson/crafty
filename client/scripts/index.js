@@ -7,7 +7,8 @@ require("./lib/bootstrap");
 // window.View = require("./lib/view");
 window.socket = io.connect(location.origin);
 require("./lib/router");
-require("Ractive"); // ractive is global apparently
+require("ractive"); // ractive is global apparently
+require("./lib/ractive-adaptors-backbone");
 
 // create a singleton Craft instance
 var Craft = require("./lib/craft");
