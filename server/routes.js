@@ -7,11 +7,11 @@ module.exports = function(app) {
 	app.use(function(req, res, next) {
 		res.render("index", {
 			styles: [
-				"/main.css"
+				"/css/main.css"
 			],
 			scripts: [
 				"/socket.io/socket.io.js",
-				"/main.js"
+				"/js/main.js"
 			],
 			runtime: {
 				env: process.env.NODE_ENV,

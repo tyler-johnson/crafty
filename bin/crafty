@@ -22,7 +22,7 @@ if (argv.development) process.env.NODE_ENV = "development";
 var env = process.env.NODE_ENV;
 
 // load config
-var conf = require("../lib/config"),
+var conf = require("../server/config"),
 	configFiles = _.compact([ argv.config, "crafty.json", "crafty.js" ]);
 
 // find the config file
@@ -43,4 +43,4 @@ conf.load(mandatory);
 conf.validate();
 
 // and launch
-require("../lib/");
+require("../server/");

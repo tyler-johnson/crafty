@@ -96,15 +96,15 @@ module.exports = function(server) {
 				fn(_.keys(craft.players));
 			});
 
-			method("props", function(data, fn) {
-				if (_.isFunction(data) && fn == null) {
-					fn = data;
-					data = null;
-				}
+			// method("props", function(data, fn) {
+			// 	if (_.isFunction(data) && fn == null) {
+			// 		fn = data;
+			// 		data = null;
+			// 	}
 
-				if (_.isObject(data)) $env.prop(null, data).then(fn);
-				else fn($env.prop());
-			});
+			// 	if (_.isObject(data)) $env.prop(null, data).then(fn);
+			// 	else fn($env.prop());
+			// });
 		}
 	});
 

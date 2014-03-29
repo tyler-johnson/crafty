@@ -4,7 +4,8 @@ var express = require("express"),
 	path = require("path"),
 	Promise = require("bluebird"),
 	Environment = require("./env"),
-	Templates = require("./templates");
+	Templates = require("./templates"),
+	lessMiddleware = require('less-middleware');
 
 // path helper
 var baseDir = path.resolve(__dirname, "..");
@@ -25,7 +26,7 @@ var env =
 global.$env = new Environment(resolve("minecraft"));
 
 // Templates
-var tpl = new Templates(resolve("client/templates"));
+var tpl = new Templates(resolve("server/templates"));
 
 // express middleware
 if (process.env.NODE_ENV === "development") {
@@ -34,8 +35,11 @@ if (process.env.NODE_ENV === "development") {
 	app.use(express.logger("default"));
 	app.use(express.compress());
 }
+app.use(lessMiddleware(resolve("public/less"), {
+	dest: resolve("public/css")
+}));
 app.use(tpl.middleware({ layout: "layout" }));
-app.use(express.static(resolve("client/dist")));
+// app.use(express.static(resolve("client/dist")));
 app.use(express.static(resolve("public")));
 
 // set up socket.io

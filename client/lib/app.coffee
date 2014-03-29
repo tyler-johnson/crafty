@@ -8,7 +8,7 @@ app =
 	# app state
 	state: "init"
 	initTimer: new Date # date cache for the *rough* time of launch
-	util: require("../../../lib/util")
+	util: require("../../lib/util")
 
 	# init defers a call to start
 	init: () -> _.defer @wait()

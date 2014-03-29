@@ -1,5 +1,4 @@
 var fez = require("fez"),
-	less = require("less"),
 	browserify = require('browserify'),
 	Promise = require("bluebird"),
 	path = require("path"),
@@ -33,15 +32,8 @@ function htmlr(file) {
 	}
 }
 
-function lessParser(file) {
-	return new(less.Parser)({
-		paths: [ path.dirname(file.getFilename()) ],
-		filename: file.getFilename()
-	});
-}
-
 exports.build = function(spec) {
-	spec.with("client/scripts/index.js").one(function(files) {
+	spec.with("client/index.js").one(function(files) {
 		var cache = {};
 		var secondary = files.map(function(file) {
 			return new Promise(function(resolve, reject) {
@@ -65,7 +57,7 @@ exports.build = function(spec) {
 			});
 		});
 
-		spec.rule(files, secondary, 'client/dist/main.js', function(inputs) {
+		spec.rule(files, secondary, 'public/js/main.js', function(inputs) {
 			var b = browserify({
 				extensions: [ ".html", ".coffee" ]
 			});
@@ -80,58 +72,6 @@ exports.build = function(spec) {
 			var resolver = Promise.defer();
 			b.bundle({ debug: true, cache: cache }, resolver.callback);
 			return resolver.promise;
-		});
-	});
-
-	// spec.with("client/dist/*.js").not('client/dist/*.min.js').each(function(file) {
-	// 	spec.rule(file, file.patsubst("client/dist/%.js", "client/dist/%.min.js"), uglify());
-	// });
-
-	spec.with("client/styles/main.less").one(function(files) {
-		var secondary = files.map(function(file) {
-			var parser = lessParser(file);
-
-			return file.asBuffer()
-				.then(function(data) {
-					var resolver = Promise.defer(),
-						src = data.toString("utf-8");
-
-					parser.parse(src, resolver.callback);
-					return resolver.promise;
-				})
-				.then(function(tree) {
-					return tree.rules
-						.filter(function(rule) { return rule.importedFilename; })
-						.map(function(rule) { return rule.importedFilename; });
-				});
-		});
-
-		spec.rule(files, secondary, "client/dist/main.css", function(inputs) {
-			var input = inputs[0],
-				parser = lessParser(input);
-
-			return input.asBuffer()
-				.then(function(contents) {
-					var resolver = Promise.defer(),
-						src = contents.toString("utf-8");
-
-					parser.parse(src, resolver.callback);
-					return resolver.promise;
-				})
-				.then(function(tree) {
-					return tree.toCSS({
-						// cleancss: true,
-						// cleancssOptions: {
-						// 	keepSpecialComments: 0
-						// }
-					});
-				})
-				.catch(function(e) {
-					if (e.index != null || e.line != null)
-						console.error("Less Error: %s\n  => %s %s:%s", e.message, e.filename, e.index, e.line);
-
-					throw e;
-				});
 		});
 	});
 }

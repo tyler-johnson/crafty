@@ -1,48 +1,5 @@
 var MC_URL = "https://s3.amazonaws.com/Minecraft.Download/versions/%v/minecraft_server.%v.jar",
-	VERSIONS = [ "1.7.4", "1.7.5" ],
-	RUNTIME_FILES = {
-		// "banned": "banned-players.txt",
-		"ops": "ops.txt",
-		"whitelist": "white-list.txt",
-		"game": "server.properties"
-	},
-	DEFAULT_PROPS = {
-		"ops": [],
-		"whitelist": [],
-		"game": {
-			"generator-settings": "",
-			"op-permission-level": 4,
-			"allow-nether": true,
-			"level-name": "world",
-			"enable-query": false,
-			"allow-flight": false,
-			"announce-player-achievements": true,
-			"server-port": 25565,
-			"level-type": "DEFAULT",
-			"enable-rcon": false,
-			"force-gamemode": false,
-			"level-seed": "",
-			"server-ip": "",
-			"max-build-height": 256,
-			"spawn-npcs": true,
-			"white-list": false,
-			"spawn-animals": true,
-			"snooper-enabled": true,
-			"hardcore": false,
-			"online-mode": true,
-			"resource-pack": "",
-			"pvp": true,
-			"difficulty": 1,
-			"enable-command-block": false,
-			"player-idle-timeout": 0,
-			"gamemode": 0,
-			"max-players": 20,
-			"spawn-monsters": true,
-			"view-distance": 10,
-			"generate-structures": true,
-			"motd": "A Minecraft Server"
-		}
-	};
+	VERSIONS = [ "1.7.4", "1.7.5" ];
 
 var Promise = require("bluebird"),
 	_ = require("underscore"),
@@ -52,8 +9,8 @@ var Promise = require("bluebird"),
 	fs = Promise.promisifyAll(require("fs")),
 	http = require("https"),
 	MCServer = require("./minecraft"),
-	javaProps = require("properties-parser"),
-	util = require("./util");
+	Props = require("./props"),
+	javaProps = require("properties-parser");
 
 module.exports = Environment;
 
@@ -63,12 +20,11 @@ function Environment(dir, options) {
 
 	this.options = _.defaults(options || {}, {
 		version: _.last(VERSIONS),
-		jar: "server.jar",
-		propfile: "minecraft.json"
+		jar: "server_%v.jar"
 	});
 
 	this.dir = path.resolve(dir || ".");
-	this.props = DEFAULT_PROPS;
+	this.props = new Props();
 	this.server();
 }
 
@@ -87,8 +43,7 @@ Environment.prototype.init = function(cb) {
 		}),
 
 		// meanwhile, load up server properties
-		this._loadProps()
-		.then(this._writeProps)
+		this.props.fetch()
 	])
 	.bind(this)
 	.then(function() {
@@ -149,7 +104,17 @@ Environment.prototype.server = function() {
 	return this._server = new MCServer(jar, this.options);
 }
 
-Environment.prototype._readFile = function(name) {
+// start up sequence
+Environment.prototype.start = function(cb) {
+	return this.props.saveAll()
+		.bind(this)
+		.then(function() {
+			this.server().start();
+		})
+		.nodeify(cb);
+}
+
+Environment.prototype.readFile = function(name) {
 	var filename = this.resolve(name);
 
 	return new Promise(function(resolve, reject) {
@@ -176,7 +141,7 @@ Environment.prototype._readFile = function(name) {
 	});
 }
 
-Environment.prototype._writeFile = function(name, data) {
+Environment.prototype.writeFile = function(name, data) {
 	return Promise.try(function() {
 		var filename = this.resolve(name);
 		if (_.isEmpty(data)) data = "";
@@ -201,43 +166,6 @@ Environment.prototype._writeFile = function(name, data) {
 			}
 		}
 
-		return fs.writeFileAsync(filename, data, { flag: "w" }).bind(this);
+		return fs.writeFileAsync(filename, data, { flag: "w" });
 	}, null, this);
-}
-
-Environment.prototype.prop = function(key, val, cb) {
-	if (val === void 0) return util.getProps(this.props, key);
-	
-	util.setProps(this.props, key, val);
-	this.emit("prop", key, val);
-	return cb !== false ? this._writeProps().nodeify(cb) : true;
-}
-
-// Read the properties file and merges data
-Environment.prototype._loadProps = function() {
-	return this._readFile(this.options.propfile)
-		.then(function(data) {
-			this.prop(null, data, false);
-		});
-}
-
-Environment.prototype._writeProps = function() {
-	return this._writeFile(this.options.propfile, this.props);
-}
-
-// writes properties to minecraft runtime files
-Environment.prototype.writeRuntimeFiles = function() {
-	return Promise.all(_.map(RUNTIME_FILES, _.bind(function(file, key) {
-		var d = this.prop(key);
-		return this._writeFile(file, d != null ? d : "");
-	}, this))).bind(this);
-}
-
-// start up sequence
-Environment.prototype.start = function(cb) {
-	return this.writeRuntimeFiles()
-		.then(function() {
-			this.server().start();
-		})
-		.nodeify(cb);
 }
