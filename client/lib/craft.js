@@ -1,6 +1,7 @@
 var Backbone = require("backbone"),
 	_ = require("underscore"),
-	Promise = require("bluebird");
+	Promise = require("bluebird"),
+	Props = require("./props");
 
 module.exports = Craft;
 
@@ -28,7 +29,8 @@ function Craft() {
 	});
 
 	// Load props once on start up
-	this.props = new Properties();
+	this.props = new Props();
+	this.props.fetch();
 }
 
 // eventful
@@ -54,44 +56,44 @@ Craft.prototype._stateChange = function(state) {
 }
 
 // server properties
-var Properties = Backbone.Model.extend({
-	initialize: function() {
-		this.listenTo(socket, "props", this.set.bind(this));
-		this.listenTo(socket, "reconnect", this.fetch.bind(this, null));
-		this.fetch();
-	},
-	isNew: function() {
-		return false;
-	},
-	sync: function(method, model, options) {
-		if (options == null) options = {};
-		if (!_.isFunction(options.success)) options.success = noop;
-		if (!_.isFunction(options.error)) options.error = noop;
+// var Properties = Backbone.Model.extend({
+// 	initialize: function() {
+// 		this.listenTo(socket, "props", this.set.bind(this));
+// 		this.listenTo(socket, "reconnect", this.fetch.bind(this, null));
+// 		this.fetch();
+// 	},
+// 	isNew: function() {
+// 		return false;
+// 	},
+// 	sync: function(method, model, options) {
+// 		if (options == null) options = {};
+// 		if (!_.isFunction(options.success)) options.success = noop;
+// 		if (!_.isFunction(options.error)) options.error = noop;
 
-		var promise = new Promise(function(resolve, reject) {
-			switch (method) {
-				case "read":
-					socket.emit("props", resolve);
-					break;
+// 		var promise = new Promise(function(resolve, reject) {
+// 			switch (method) {
+// 				case "read":
+// 					socket.emit("props", resolve);
+// 					break;
 
-				case "create":
-					reject(new Error("Cannot create props."));
-					break;
+// 				case "create":
+// 					reject(new Error("Cannot create props."));
+// 					break;
 
-				case "update":
-					socket.emit("props", model.toJSON(), resolve);
-					break
+// 				case "update":
+// 					socket.emit("props", model.toJSON(), resolve);
+// 					break
 
-				case "delete":
-					reject(new Error("Cannot delete props."));
-					break;
-			}
-		});
+// 				case "delete":
+// 					reject(new Error("Cannot delete props."));
+// 					break;
+// 			}
+// 		});
 
-		promise.then(options.success, options.error);
-		model.trigger('request', model, promise, options);
-		return promise;
-	}
-});
+// 		promise.then(options.success, options.error);
+// 		model.trigger('request', model, promise, options);
+// 		return promise;
+// 	}
+// });
 
-function noop(){}
+// function noop(){}

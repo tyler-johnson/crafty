@@ -5,7 +5,20 @@ var BOOL_PROPS = [ "generate-structures", "spawn-animals", "spawn-monsters", "sp
 
 module.exports = Ractive.extend({
 	init: function() {
-		this.set("props", $craft.props);
+		var setProp = _.bind(function(prop) {
+			if (prop != null) this.set(prop.id, prop.toJSON());
+		}, this);
+
+		setProp($craft.props.get("server"));
+		setProp($craft.props.get("game"));
+
+		function onAdd(prop) {
+			if (prop.id === "server" || prop.id === "game") setProp(prop);
+		}
+		$craft.props.on("add", onAdd, this);
+		this.on("teardown", function() {
+			$craft.props.off("add", onAdd);
+		});
 
 		this.on("save:enter", function() {
 			this.findAll(".btn").forEach(function(btn) {

@@ -9,7 +9,7 @@ var RUNTIME = require("./runtime");
 var Prop = Backbone.Model.extend({
 	sync: sync,
 	idAttribute: "_id",
-	toJSON: function() {
+	toSave: function() {
 		return this.has("_value") ? this.get("_value") : this.omit(this.idAttribute);
 	}
 });
@@ -61,7 +61,7 @@ function sync(method, model, options) {
 			case "update":
 				var prop = RUNTIME[model.id];
 				if (prop == null) return;
-				return $env.writeFile(prop.file, model.toJSON());
+				return $env.writeFile(prop.file, model.toSave());
 
 			case "delete":
 				var prop = RUNTIME[model.id];
@@ -74,12 +74,4 @@ function sync(method, model, options) {
 	promise.then(options.success, options.error);
 	model.trigger('request', model, promise, options);
 	return promise;
-}
-
-function rando(n) {
-	var str = "";
-	while(n--) {
-		str += Math.floor(Math.random() * 16).toString(16);
-	}
-	return str;
 }

@@ -13,5 +13,11 @@ module.exports = convict({
 		format: "port",
 		default: 3000,
 		env: "PORT"
+	},
+	cwd: {
+		doc: "The current working directory that server files will be written to.",
+		format: String,
+		default: process.cwd(),
+		env: "CRAFTY_PATH"
 	}
 });

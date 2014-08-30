@@ -1,42 +1,45 @@
 {
-	"name": "crafty",
-	"version": "0.1.1",
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/appleifreak/crafty.git"
-	},
-	"scripts": {
-		"start": "./bin/crafty -p 80 > out.log 2>&1 &",
-		"dev": "nodemon -e js,html -w lib/ -w server/ --exec \"./bin/crafty\"",
-		"build": "node fez.js -c && nodemon -e js,html,json,coffee -w client/ -w lib/ fez.js"
-	},
-	"bin": {
-		"crafty": "./bin/crafty"
-	},
-	"dependencies": {
-		"underscore": "1.6.0",
-		"moment": "2.5.1",
-		"socket.io": "0.9.16",
-		"nbt": "0.3.0",
-		"bluebird": "1.1.1",
-		"mkdirp": "0.3.5",
-		"express": "3.5.0",
-		"page": "1.3.7",
-		"jquery": "2.1.0",
-		"backbone": "1.1.2",
-		"minimist": "0.0.8",
-		"convict": "0.4.2",
-		"properties-parser": "0.1.1",
-		"ractive": "0.4.0-pre2",
-		"less-middleware": "0.2.1-beta"
-	},
-	"devDependencies": {
-		"fez": "1.0.8",
-		"browserify": "3.32.0",
-		"through": "2.3.4",
-		"module-deps": "1.8.0",
-		"coffeeify": "0.6.0",
-		"browser-builtins": "3.1.0",
-		"fez-uglify": "0.1.0"
-	}
+  "name": "crafty",
+  "version": "0.2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/appleifreak/crafty.git"
+  },
+  "scripts": {
+    "start": "./bin/crafty -p 80 > out.log 2>&1 &",
+    "dev": "nodemon -e js,html -w lib/ -w server/ --exec \"./bin/crafty minecraft\"",
+    "build": "node fez.js -c && nodemon -e js,html,json,coffee -w client/ -w lib/ fez.js"
+  },
+  "bin": {
+    "crafty": "./bin/crafty"
+  },
+  "dependencies": {
+    "backbone": "1.1.2",
+    "bluebird": "2.3.2",
+    "compression": "^1.0.11",
+    "convict": "0.4.2",
+    "express": "4.8.7",
+    "jquery": "2.1.1",
+    "less-middleware": "1.0.4",
+    "minimist": "1.1.0",
+    "mkdirp": "0.5.0",
+    "moment": "2.8.2",
+    "morgan": "^1.2.3",
+    "nbt": "0.3.0",
+    "page": "1.3.7",
+    "properties-parser": "0.2.3",
+    "ractive": "0.4.0-pre2",
+    "serve-static": "^1.5.3",
+    "socket.io": "1.0.6",
+    "underscore": "1.7.0"
+  },
+  "devDependencies": {
+    "fez": "1.0.8",
+    "browserify": "5.11.0",
+    "through": "2.3.4",
+    "module-deps": "3.5.5",
+    "coffeeify": "0.7.0",
+    "browser-builtins": "3.2.0",
+    "fez-uglify": "0.1.0"
+  }
 }

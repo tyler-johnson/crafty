@@ -47,13 +47,6 @@ MCServer.command = function(jar, ram) {
 	].join(" ");
 }
 
-MCServer.prototype.exists = function() {
-	var jar = this.jar;
-	return new Promise(function(resolve) {
-		fs.exists(jar, resolve);
-	});
-}
-
 MCServer.prototype.start = function() {
 	if (this.process != null ||
 		this.state == "starting" ||

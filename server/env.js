@@ -9,109 +9,109 @@ var Promise = require("bluebird"),
 	fs = Promise.promisifyAll(require("fs")),
 	http = require("https"),
 	MCServer = require("./minecraft"),
+	MCVersions = require("./versions"),
 	Props = require("./props"),
 	javaProps = require("properties-parser");
 
-module.exports = Environment;
+var default_opts = {
+	jar: "server.jar"
+}
 
 function Environment(dir, options) {
 	if (!(this instanceof Environment))
 		return new Environment(dir, options);
 
-	this.options = _.defaults(options || {}, {
-		version: _.last(VERSIONS),
-		jar: "server_%v.jar"
-	});
+	options = _.pick(options || {}, _.keys(default_opts));
+	_.defaults(this, options, default_opts);
 
-	this.dir = path.resolve(dir || ".");
+	this.directory = path.resolve(dir || ".");
 	this.props = new Props();
-	this.server();
+	this.versions = new MCVersions({
+		directory: this.resolve("versions")
+	});
 }
+
+module.exports = Environment;
 
 // eventful
 Environment.prototype = Object.create(EventEmitter.prototype);
 
-Environment.prototype.init = function(cb) {
-	return Promise.all([
-		// install the server jar file
-		this.server().exists().bind(this)
-		.then(function(exists) {
-			if (!exists) {
-				return mkdirp(this.dir)
-					.then(this.installServer.bind(this, null));
-			}
-		}),
+Environment.prototype.init = function() {
+	// ensure the directory exists
+	return mkdirp(this.directory).bind(this)
 
-		// meanwhile, load up server properties
-		this.props.fetch()
-	])
-	.bind(this)
-	.then(function() {
-		this.emit("init");
-	})
-	.nodeify(cb);
+	// load up server properties
+	.then(function() { return this.props.fetch(); })
+
+	// init event
+	.then(function() { this.emit("init"); });
 }
 
 Environment.prototype.resolve = function(file) {
-	return path.resolve(this.dir, file);
+	return path.resolve(this.directory, file);
 }
 
-Environment.prototype.installServer = function(version, cb) {
-	if (_.isFunction(version) && cb == null) {
-		cb = version;
-		version = null;
-	}
+Environment.prototype.load = function(version) {
+	if (this._version === version) return Promise.bind(this);
+	var file = this.resolve(this.jar);
 
-	if (version == null) version = this.options.version;
+	return this.unload()
 
-	this.emit("install:before");
-
-	var filename = this.resolve(this.options.jar),
-		url = Environment.serverUrl(version);
-
-	return new Promise(function(resolve, reject) {
-		http.get(url, onResponse).on('error', reject);
-
-		function onResponse(res) {
-			if (res.statusCode != 200)
-				return reject(new Error("Non-200 status returned."));
-
-			res.on("error", reject);
-			res.on("end", resolve);
-			res.pipe(fs.createWriteStream(filename));
-		}
-	})
-	.bind(this)
+	// load in the server file
 	.then(function() {
-		this.emit("install");
-		this.emit("install:after");
+		return this.versions.load(version, file);
 	})
-	.nodeify(cb);
+
+	// new server instance
+	.then(function() {
+		this._version = version;
+		var server = this._server = new MCServer(file);
+		this.emit("load", server);
+		return server;
+	});
 }
 
-Environment.serverUrl = function(version) {
-	if (!_.contains(VERSIONS, version))
-		throw new Error("Unsupported version '" + version + "'");
+Environment.prototype.unload = function() {
+	var file = this.resolve(this.jar);
 
-	return MC_URL.replace(/%v/g, version);
+	// stop the server if it is running
+	return this.stop()
+
+	// delete server file if it exists
+	.then(function() { return util.fileExistsAsync(file) })
+	.then(function(exists) { if (exists) return fs.unlinkAsync(file); })
+
+	// reset properties
+	.then(function() {
+		delete this._version;
+		delete this._server;
+		this.emit("unload");
+	});
 }
-
-Environment.supported = VERSIONS;
 
 Environment.prototype.server = function() {
-	if (this._server != null) return this._server;
-	var jar = this.resolve(this.options.jar);
-	return this._server = new MCServer(jar, this.options);
+	return this._server || null;
 }
 
 // start up sequence
-Environment.prototype.start = function(cb) {
-	return this.props.saveAll()
-		.bind(this)
-		.then(function() {
-			this.server().start();
-		})
-		.nodeify(cb);
+Environment.prototype.start = function(version) {
+	// load up the server file
+	return this.load(version)
+
+	// write all properties to disk
+	.then(function() { return this.props.saveAll(); })
+
+	// start the server
+	.then(function() { this.server().start(); });
+}
+
+Environment.prototype.stop = function() {
+	return new Promise(function(resolve, reject) {
+		var server = this.server();
+		if (server == null) return resolve();
+		server.on("exit", resolve);
+		server.stop();
+	}).bind(this);
 }
 
 Environment.prototype.readFile = function(name) {
@@ -169,3 +169,5 @@ Environment.prototype.writeFile = function(name, data) {
 		return fs.writeFileAsync(filename, data, { flag: "w" });
 	}, null, this);
 }
+
+

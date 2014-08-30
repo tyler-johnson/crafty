@@ -37,6 +37,7 @@ _.some(configFiles, function(filename) {
 // load mandatory config
 var mandatory = { env: env };
 if (_.isNumber(argv.port)) mandatory.port = argv.port;
+if (argv._.length) mandatory.cwd = path.resolve(process.cwd(), argv._[0]);
 conf.load(mandatory);
 
 // validate config
