@@ -5,7 +5,8 @@ var JAVA_PATH = "java",
 		done:    /^Done \([.0-9a-zA-Z]+\)!/,
 		join:    /^(\w+) ?(?:\[(.+)\] )?logged in with entity id (\d+) at \(([\d\s\-\.,]+)\)$/,
 		leave:   /^(\w+) lost connection: (.+)$/,
-		bind:    /^\*+ FAILED TO BIND TO PORT\!$/
+		bind:    /^\*+ FAILED TO BIND TO PORT\!$/,
+		eula:    /agree to the EULA/
 	};
 
 // Dependencies
@@ -48,9 +49,7 @@ MCServer.command = function(jar, ram) {
 }
 
 MCServer.prototype.start = function() {
-	if (this.process != null ||
-		this.state == "starting" ||
-		this.state == "ready") return false;
+	if (this.isRunning()) return false;
 
 	this.state = "starting";
 	this.emit("start");
@@ -68,10 +67,14 @@ MCServer.prototype.start = function() {
 	return true;
 }
 
+MCServer.prototype.isRunning = function() {
+	return this.process != null ||
+		this.state == "starting" ||
+		this.state == "ready";
+}
+
 MCServer.prototype.stop = function() {
-	if (this.process == null ||
-		this.state == "stopping" ||
-		this.state == "stopped") return false;
+	if (this.isStopped()) return false;
 	
 	this.state = "stopping";
 	_.keys(this.players).forEach(this._playerLeft.bind(this));
@@ -82,6 +85,12 @@ MCServer.prototype.stop = function() {
 	this.command("stop");
 	
 	return true;
+}
+
+MCServer.prototype.isStopped = function() {
+	return this.process == null ||
+		this.state == "stopping" ||
+		this.state == "stopped";
 }
 
 MCServer.prototype.ready = function(fn) {
@@ -162,6 +171,9 @@ MCServer.prototype._onData = function(data) {
 			case "bind":
 				this.emit("error", new Error("Failed to bind port."));
 				break;
+
+			case "eula":
+				this.emit("eula");
 		}
 
 		return true;

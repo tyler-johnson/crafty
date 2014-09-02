@@ -1,7 +1,7 @@
 var Backbone = require("backbone"),
 	_ = require("underscore"),
 	Promise = require("bluebird"),
-	util = require("../../lib/util");
+	util = require("./util");
 
 var Prop = Backbone.Model.extend({
 	sync: sync,
@@ -10,6 +10,10 @@ var Prop = Backbone.Model.extend({
 
 var Props =
 module.exports = Backbone.Collection.extend({
+	constructor: function(socket, options) {
+		this.socket = socket;
+		Backbone.Collection.call(this, [], options);
+	},
 	sync: sync,
 	model: Prop,
 	saveAll: function(options) {
@@ -19,8 +23,6 @@ module.exports = Backbone.Collection.extend({
 	}
 });
 
-var emit = util.asyncSocketEvent.bind(null, socket);
-
 // a blank function
 function noop(){}
 
@@ -28,6 +30,7 @@ function sync(method, model, options) {
 	if (options == null) options = {};
 	if (!_.isFunction(options.success)) options.success = noop;
 	if (!_.isFunction(options.error)) options.error = noop;
+	var socket = model.socket || model.collection.socket || $socket;
 
 	var promise = Promise.try(function() {
 		var id;
@@ -35,7 +38,7 @@ function sync(method, model, options) {
 		switch(method) {
 			case "read":
 				if (model instanceof Prop) id = model.id;
-				return emit("props:read", id);
+				return util.asyncSocketEvent(socket, "props:read", id);
 
 			case "create":
 				throw new Error("Cannot create.");

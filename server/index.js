@@ -6,7 +6,7 @@ var path = require("path"),
 // path helper
 var baseDir = path.resolve(__dirname, "..");
 var resolve = global.$resolve = function(p) {
-	return path.resolve(baseDir, p);
+	return path.resolve(baseDir, p != null ? p : "");
 }
 
 // config
@@ -23,8 +23,16 @@ require("./express");
 // socket.io
 require("./socket");
 
-// init environment and start the server
+// init minecraft environment 
 env.init().then(function() {
+	// load the initial version
+	return $env.load($env.props.get("server").get("version"));
+})
+
+//start the server
+.then(function() {
+	console.log("Minecraft environment is ready.");
+
 	$server.listen(conf.get("port"), function() {
 		console.log("HTTP server listening on port " + conf.get("port") + "...");
 	});

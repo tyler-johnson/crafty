@@ -1,11 +1,12 @@
 var MC_URL = "https://s3.amazonaws.com/Minecraft.Download/versions/%v/minecraft_server.%v.jar",
-	MC_VERSIONS = [ "1.7.4", "1.7.5" ];
+	MC_VERSIONS = [ "1.7.10" ];
 
 var _ = require("underscore"),
 	Promise = require("bluebird"),
 	path = require("path"),
 	mkdirp = Promise.promisify(require("mkdirp")),
 	fs = require("fs"),
+	http = require("https"),
 	util = require("./util");
 
 var default_opts = {

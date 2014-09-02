@@ -1,0 +1,16 @@
+<main class="container {{ tab }}">
+	<div class="row">
+		<div class="col-lg-3">{{> sidebar }}</div>
+		<div class="col-lg-9">
+			<ul class="nav nav-tabs" id="nav">
+				<li class="{{# tab:settings }}active{{/ tab:settings }}"><a href="/settings"><i class="icon icon-cogs"></i> Settings</a></li>
+				<!-- <li<%= active("/players") %>><a href="/players"><i class="icon icon-group"></i> Players</a></li> -->
+				<li class="{{# tab:console }}active{{/ tab:console }}"><a href="/console"><i class="icon icon-terminal"></i> Console</a></li>
+				<!-- <li<%= active("/world") %>><a href="/world"><i class="icon icon-globe"></i> World</a></li> -->
+			</ul>
+			
+			{{# tab:settings }}{{> settings}}{{/ tab:settings }}
+			{{# tab:console }}{{> datafeed}}{{/ tab:console }}
+		</div>
+	</div>
+</main>

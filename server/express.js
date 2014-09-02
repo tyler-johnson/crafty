@@ -4,7 +4,8 @@ var Promise = require("bluebird"),
 	compression = require('compression'),
 	serveStatic = require('serve-static'),
 	lessMiddleware = require('less-middleware'),
-	fs = Promise.promisifyAll(require("fs"));
+	fs = Promise.promisifyAll(require("fs")),
+	path = require("path");
 
 // express app and server
 var app = global.$app = module.exports = require("express")();
@@ -18,8 +19,18 @@ if ($conf.get("env") === "development") {
 	app.use(compression());
 }
 
-app.use(lessMiddleware($resolve("public/less"), {
-	dest: $resolve("public/css")
+app.use(lessMiddleware("public/less", {
+	dest: $resolve("public"),
+	debug: true,
+	compiler: {
+		compress: false,
+		cleancss: $conf.get("env") === "production"
+	},
+	preprocess: {
+		path: function(pathname, req) {
+			return $resolve(pathname.replace("css/", ""));
+		}
+	}
 }));
 
 // app.use(express.static(resolve("client/dist")));
@@ -36,7 +47,6 @@ app.use(function(req, res, next) {
 			"/css/main.css"
 		],
 		scripts: [
-			"/socket.io/socket.io.js",
 			"/js/main.js"
 		],
 		runtime: {

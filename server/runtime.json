@@ -1,10 +1,10 @@
 {
 	"ops": {
-		"file": "ops.txt",
+		"file": "ops.json",
 		"default": []
 	},
 	"whitelist": {
-		"file": "white-list.txt",
+		"file": "whitelist.json",
 		"default": []
 	},
 	"game": {
