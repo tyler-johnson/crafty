@@ -4,15 +4,8 @@ module.exports = View.extend({
 	initialize: function() {
 		this.use("actions");
 	},
-	template: require("./layout.html"),
+	template: require("../templates/server-info.html"),
 	defaults: {
-		humanState: function() {
-			return this.get("craft.state") === "running" ? "Online" : "Offline";
-		},
-		"state:stopped": function() { return this.get("craft.state") === "stopped"; },
-		"state:starting": function() { return this.get("craft.state") === "starting"; },
-		"state:running": function() { return this.get("craft.state") === "running"; },
-		"state:stopping": function() { return this.get("craft.state") === "stopping"; },
 		stopTime: null
 	},
 	actions: {

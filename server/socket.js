@@ -12,10 +12,10 @@ module.exports = require('socket.io').listen($server, {
 	serveClient: false
 });
 
-// properties API
+// general API
 var propsAPI = clientAPI()
 .on("accept-eula", function(done) {
-	$env.acceptEULA().finally(done);
+	$env.acceptEULA().nodeify(done);
 })
 .on("props:read", function(id, done) {
 	if (_.isFunction(id) && done == null) {
@@ -23,11 +23,20 @@ var propsAPI = clientAPI()
 		id = null;
 	}
 
-	if (id == null) done($env.props.toJSON());
+	if (id == null) done(null, $env.props.toJSON());
 	else {
 		var prop = $env.props.get(id);
-		done(prop != null ? prop.toJSON() : null);
+		done(null, prop != null ? prop.toJSON() : null);
 	}
+})
+.on("props:write", function(id, data, done) {
+	var prop = $env.props.get(id);
+	
+	if (prop == null)
+		return done(new Error("No property set by that name exists."));
+
+	expect(data).to.be.an("object");
+	prop.set(data).save().return(prop.toJSON()).nodeify(done);
 })
 .connect(io.sockets);
 
@@ -50,10 +59,10 @@ $env.on("load", function(craft) {
 
 	var craftAPI = clientAPI()
 	.on("server:state", function(fn) {
-		fn(craft.state);
+		fn(null, craft.state);
 	})
 	.on("server:start", function(fn) {
-		$env.start().then(fn);
+		$env.start().nodeify(fn);
 	})
 	.on("server:stop", function(sec, fn) {
 		if (_.isFunction(sec) && fn == null) {
@@ -61,148 +70,24 @@ $env.on("load", function(craft) {
 			sec = 0;
 		}
 
-		$env.stop(sec).finally(fn);
+		$env.stop(sec).nodeify(fn);
 	})
 	.on("server:restart", function(sec, fn) {
-		$env.stop().delay(1000).then($env.start).finally(fn);
+		$env.stop().delay(1000).then($env.start).nodeify(fn);
 	})
 	.on("server:command", function() {
-		var args = _.toArray(arguments).filter(_.isString);
+		var args = _.toArray(arguments);
+		done = args.pop();
 		craft.command(args);
+		done();
 	})
 	.connect(io.sockets);
 
 	// next unload is this server instance
-	$env.once("unload", craftAPI.disconnect);
+	$env.once("unload", function() {
+		craftAPI.disconnect();
+	});
 });
-
-// module.exports = function(server) {
-
-// 	// parts
-// 	var counting = false,
-// 		io = require('socket.io').listen(server, {
-// 			"log level": 1,
-// 			"log colors": false,
-// 			"browser client minification": true,
-// 			"browser client gzip": true,
-// 			"browser client etag": true
-// 		});
-
-// 	// connects the mincraft server and socket.io
-// 	$env.on("init", function() {
-// 		var craft = $env.server();
-
-
-
-// 		_.each(io.sockets.sockets, clientAPI);
-// 		io.sockets.on('connection', clientAPI);
-
-		
-// 	});
-
-// 	return io;
-
-// }
-
-// function clientAPI(craft) {
-// 	var methods = [];
-
-// 	function method(name, fn) {
-// 		methods.push([ name, callback ]);
-// 		socket.on(name, callback);
-
-// 		function callback() {
-// 			var args = _.toArray(arguments);
-// 			if (!_.isFunction(_.last(args))) args.push(noop);
-// 			fn.apply(this, args);
-// 		}
-// 	}
-
-// 	method("server:start", function(fn) {
-// 		$env.start(fn);
-// 	});
-
-// 	method("server:stop", function(sec, fn) {
-// 		if (_.isFunction(sec) && fn == null) {
-// 			fn = sec;
-// 			sec = 0;
-// 		}
-
-// 		if (counting) return fn(false);
-		
-// 		if (isNaN(sec) || sec < 1) {
-// 			craft.stop();
-// 			fn(true);
-// 			return;
-// 		}
-
-// 		counting = true;
-// 		countdown();
-// 		var i = setInterval(countdown, 1000);
-// 		fn(true);
-
-// 		function countdown() {
-// 			if (sec > 0) {
-// 				craft.say("Server is shutting down in " + sec + "...");
-// 			} else {
-// 				craft.stop();
-// 				clearInterval(i);
-// 				counting = false;
-// 			}
-// 			sec--;
-// 		}
-// 	});
-
-// 	method("server:state", function(fn) {
-// 		fn(craft.state);
-// 	});
-
-// 	method("server:command", function() {
-// 		var args = _.toArray(arguments).filter(_.isString);
-// 		craft.command(args);
-// 	});
-
-// 	method("players", function(fn) {
-// 		fn(_.keys(craft.players));
-// 	});
-
-// 	method("props:read", function(id, done) {
-		// if (_.isFunction(id) && done == null) {
-		// 	done = id;
-		// 	id = null;
-		// }
-
-		// if (id == null) done($env.props.toJSON());
-		// else {
-		// 	var prop = $env.props.get(id);
-		// 	done(prop != null ? prop.toJSON() : null);
-		// }
-// 	});
-
-// 	method("props:update", function(id, data, done) {
-
-// 	});
-
-// 	method("props:delete", function(id, done) {
-
-// 	});
-
-// 	method("props", function(data, fn) {
-// 		if (_.isFunction(data) && fn == null) {
-// 			fn = data;
-// 			data = null;
-// 		}
-
-// 		if (_.isObject(data)) $env.prop(null, data).then(fn);
-// 		else fn($env.prop());
-// 	});
-
-// 	return function() {
-// 		methods.forEach(function(m) {
-// 			socket.off(m[0], m[1]);
-// 		});
-// 	}
-// }
 
 function clientAPI() {
 	var api,
@@ -212,9 +97,24 @@ function clientAPI() {
 	return api = {
 		on: function(name, fn) {
 			methods.push([ name, function() {
-				var args = _.toArray(arguments);
-				if (!_.isFunction(_.last(args))) args.push(noop);
-				fn.apply(this, args);
+				var args, done;
+
+				try {
+					args = _.toArray(arguments);
+					done = noop;
+					if (_.isFunction(_.last(args))) done = args.pop();
+
+					args.push(function(err) {
+						var args = _.toArray(arguments).slice(1);
+						args.unshift(err != null ? err.toString() : null);
+						done.apply(this, args);
+					});
+
+					fn.apply(this, args);
+				} catch(e) {
+					done(e.toString());
+					console.error(e.stack);
+				}
 			} ]);
 
 			return api;

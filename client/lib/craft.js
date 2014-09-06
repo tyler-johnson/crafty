@@ -14,7 +14,7 @@ function Craft(socket) {
 
 	var stateChange = _.bind(this._stateChange, this);
 	socket.on("server:state", stateChange);
-	socket.emit("server:state", stateChange);
+	util.asyncSocketEvent(socket, "server:state").then(stateChange);
 
 	var self = this;
 	
@@ -41,26 +41,26 @@ function Craft(socket) {
 
 	// Load props once on start up
 	this.props = new Props(socket);
-	this.props.fetch();
+	this.props.fetch().then($app.wait());
 
 	// Load old recent feed message
 	var recent = util.storage.get("recentServerFeed");
-	if (_.isArray(recent)) this.feed.push.apply(this.feed, recent);
+	if (_.isArray(recent) && recent.length) this.feed.push.apply(this.feed, recent);
 }
 
 // eventful
 Craft.prototype = Object.create(Backbone.Events);
 
 Craft.prototype.start = function() {
-	this.socket.emit("server:start");
+	return util.asyncSocketEvent(this.socket, "server:start");
 }
 
 Craft.prototype.stop = function(n) {
-	this.socket.emit("server:stop", n);
+	return util.asyncSocketEvent(this.socket, "server:stop", n);
 }
 
 Craft.prototype.restart = function() {
-	this.socket.emit("server:restart");
+	return util.asyncSocketEvent(this.socket, "server:restart");
 }
 
 Craft.prototype.command = function() {
@@ -73,8 +73,7 @@ Craft.prototype.command = function() {
 		time: false
 	});
 
-	this.socket.emit("server:command", cmd);
-	return this;
+	return util.asyncSocketEvent(this.socket, "server:command", cmd);
 }
 
 Craft.prototype.log = function(str, options) {
@@ -106,46 +105,3 @@ Craft.prototype._stateChange = function(state) {
 	this.state = state;
 	this.trigger("state", state);
 }
-
-// server properties
-// var Properties = Backbone.Model.extend({
-// 	initialize: function() {
-// 		this.listenTo(socket, "props", this.set.bind(this));
-// 		this.listenTo(socket, "reconnect", this.fetch.bind(this, null));
-// 		this.fetch();
-// 	},
-// 	isNew: function() {
-// 		return false;
-// 	},
-// 	sync: function(method, model, options) {
-// 		if (options == null) options = {};
-// 		if (!_.isFunction(options.success)) options.success = noop;
-// 		if (!_.isFunction(options.error)) options.error = noop;
-
-// 		var promise = new Promise(function(resolve, reject) {
-// 			switch (method) {
-// 				case "read":
-// 					socket.emit("props", resolve);
-// 					break;
-
-// 				case "create":
-// 					reject(new Error("Cannot create props."));
-// 					break;
-
-// 				case "update":
-// 					socket.emit("props", model.toJSON(), resolve);
-// 					break
-
-// 				case "delete":
-// 					reject(new Error("Cannot delete props."));
-// 					break;
-// 			}
-// 		});
-
-// 		promise.then(options.success, options.error);
-// 		model.trigger('request', model, promise, options);
-// 		return promise;
-// 	}
-// });
-
-// function noop(){}

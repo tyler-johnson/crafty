@@ -5,7 +5,7 @@ module.exports = View.extend({
 		this.use("twoway");
 		this.use("actions");
 	},
-	template: require("./layout.html"),
+	template: require("../templates/settings.html"),
 	defaults: {
 		mcversions: $app.minecraft_versions,
 		motd_count: function() {
@@ -16,7 +16,7 @@ module.exports = View.extend({
 		success: false,
 		error: null,
 		normal: function() {
-			return !(this.get("success") || this.get("error"));
+			return this.get("craft.state") === "running" && !(this.get("success") || this.get("error"));
 		}
 	},
 	actions: {

@@ -38,27 +38,21 @@ function sync(method, model, options) {
 		switch(method) {
 			case "read":
 				if (model instanceof Prop) id = model.id;
-				return util.asyncSocketEvent(socket, "props:read", id);
+				return util.asyncSocketEvent(socket, "props:read", id)
 
 			case "create":
 				throw new Error("Cannot create.");
 
 			case "update":
-				// var prop = RUNTIME[model.id];
-				// if (prop == null) return;
-				// return $env.writeFile(prop.file, model.toJSON());
+				id = model.id;
+				return util.asyncSocketEvent(socket, "props:write", id, model.toJSON());
 
 			case "delete":
-				// var prop = RUNTIME[model.id];
-				// if (prop == null) return;
-				// return fs.unlinkAsync($env.resolve(prop.file));
+				throw new Error("Can't delete properties from the browser.");
 		}
 
 	});
 
-	promise.then(function(data) {
-		console.log(data);
-	});
 	promise.then(options.success, options.error);
 	model.trigger('request', model, promise, options);
 	return promise;

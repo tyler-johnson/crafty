@@ -44,7 +44,7 @@ window.addEventListener("click", function(e) {
     app.navigate(href.pathname, { trigger: true });
 });
 
-var layout = global.$layout = new(require("./views/layout"))(null, {
+var layout = global.$layout = new(require("./views/panel-layout"))(null, {
 	app: app,
 	craft: $craft
 });
@@ -68,40 +68,3 @@ app.route("console", function() {
 	app.setTitle("Console");
 	layout.set("tab", "console");
 });
-
-/*// load nav
-var nav;
-app.preroute(function(ctx, next) {
-	if (nav == null) {
-		nav = new Ractive({
-			el: "#nav",
-			template: require("./templates/nav"),
-			data: {
-				active: function(path) {
-				    return this.get("pathname") === path ? " active" : "";
-				}
-			}
-		});
-	}
-
-	nav.set("pathname", ctx.pathname);
-	next();
-});
-
-// console route
-app.route("/console", function(ctx) {
-	var view = new (require("./views/data-feed"))();
-	ctx.on("close", view.teardown, view);
-});
-
-// settings route
-app.route("/settings", function(ctx) {
-	var view = new (require("./views/settings"))();
-	ctx.on("close", view.teardown, view);
-});
-
-// load sidebar on start
-app.ready(function() {
-	require("./views/sidebar");
-});
-*/

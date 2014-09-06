@@ -1,25 +1,25 @@
-<form class="form-horizontal" on-submit="submit">
+<form class="form-horizontal">
 	<fieldset>
 		<legend>General</legend>
 
 		<div class="form-group">
 			<label class="control-label col-lg-2" for="inputName">Name</label>
 			<div class="col-lg-10">
-				<input type="text" class="form-control" id="inputName" name="server[name]" value="{{ server.name }}" />
+				<input type="text" class="form-control" id="inputName" bind-to="{{ craft.props.server.name }}" />
 			</div>
 		</div>
 
 		<div class="form-group">
 			<label class="control-label col-lg-2" for="inputImage">Image URL</label>
 			<div class="col-lg-10">
-				<input type="text" class="form-control" id="inputImage" name="server[image]" value="{{ server.image }}" />
+				<input type="text" class="form-control" id="inputImage" bind-to="{{ craft.props.server.image }}" />
 			</div>
 		</div>
 
 		<div class="form-group">
 			<label class="control-label col-lg-2" for="selectVersion">Minecraft Version</label>
 			<div class="col-lg-3">
-				<select name="server[version]" value="{{ server.version }}" id="selectVersion" class="form-control">
+				<select bind-to="{{ server.version }}" id="selectVersion" class="form-control">
 					{{#mcversions}}
 					<option value="{{ this }}">{{ this }}</option>
 					{{/mcversions}}
@@ -36,18 +36,18 @@
 
 		<div class="form-group">
 			<label class="control-label col-lg-2" for="inputMOTD">Welcome Text</label>
-			<div class="col-lg-9">
-				<input type="text" class="form-control" id="inputMOTD" maxlength="59" name="game[motd]" value="{{ game.motd }}" />
+			<div class="col-lg-8">
+				<input type="text" class="form-control" id="inputMOTD" maxlength="59" bind-to="{{ craft.props.game.motd }}" />
 			</div>
-			<div class="col-lg-1">
-				<p class="help-block">0 / 59</p>
+			<div class="col-lg-2">
+				<p class="help-block">{{ motd_count }} / 59</p>
 			</div>
 		</div>
 
 		<div class="form-group">
 			<label class="control-label col-lg-2" for="selectGameDifficulty">Difficulty</label>
 			<div class="col-lg-3">
-				<select name="game[difficulty]" value="{{ game.difficulty }}" id="selectGameDifficulty" class="form-control">
+				<select bind-to="{{ craft.props.game.difficulty }}" id="selectGameDifficulty" class="form-control">
 					<option value="0">Peaceful</option>
 					<option value="1">Easy</option>
 					<option value="2">Normal</option>
@@ -59,7 +59,7 @@
 		<div class="form-group">
 			<label class="control-label col-lg-2" for="selectGameMode">Game Mode</label>
 			<div class="col-lg-3">
-				<select name="game[gamemode]" value="{{ game.gamemode }}" id="selectGameMode" class="form-control">
+				<select bind-to="{{ craft.props.game.gamemode }}" id="selectGameMode" class="form-control">
 					<option value="0">Survival</option>
 					<option value="1">Creative</option>
 					<option value="2">Adventure</option>
@@ -71,7 +71,7 @@
 		<div class="form-group">
 			<label class="control-label col-lg-2" for="inputGameMaxPlayers">Max Players</label>
 			<div class="col-lg-3">
-				<input type="number" class="form-control" id="inputGameMaxPlayers" name="game[max-players]" value="{{ game["max-players"] }}" />
+				<input type="number" class="form-control" id="inputGameMaxPlayers" bind-to="{{ craft.props.game.max-players }}" />
 			</div>
 		</div>
 
@@ -79,10 +79,10 @@
 			<label class="control-label col-lg-2">Spawn</label>
 			<div class="col-lg-10">
 				<div class="checkbox">
-					<label><input name="game[generate-structures]" checked="{{ game["generate-structures"] }}" type="checkbox" /> Structures</label>
-					<label><input name="game[spawn-animals]" checked="{{ game["spawn-animals"] }}" type="checkbox" /> Animals</label>
-					<label><input name="game[spawn-monsters]" checked="{{ game["spawn-monsters"] }}" type="checkbox" /> Monsters</label>
-					<label><input name="game[spawn-npcs]" checked="{{ game["spawn-npcs"] }}" type="checkbox" /> NPCs</label>
+					<label><input bind-to="{{ craft.props.game.generate-structures }}" type="checkbox" /> Structures</label>
+					<label><input bind-to="{{ craft.props.game.spawn-animals }}" type="checkbox" /> Animals</label>
+					<label><input bind-to="{{ craft.props.game.spawn-monsters }}" type="checkbox" /> Monsters</label>
+					<label><input bind-to="{{ craft.props.game.spawn-npcs }}" type="checkbox" /> NPCs</label>
 				</div>
 			</div>
 		</div>
@@ -91,9 +91,9 @@
 			<label class="control-label col-lg-2">Misc</label>
 			<div class="col-lg-10">
 				<div class="checkbox">
-					<label><input name="game[allow-flight]" checked="{{ game["allow-flight"] }}" type="checkbox" /> Enable Flight</label>
-					<label><input name="game[allow-nether]" checked="{{ game["allow-nether"] }}" type="checkbox" /> Allow Nether Portals</label>
-					<label><input name="game[pvp]" checked="{{ game["pvp"] }}" type="checkbox" /> PVP</label>
+					<label><input bind-to="{{ craft.props.game.allow-flight }}" type="checkbox" /> Enable Flight</label>
+					<label><input bind-to="{{ craft.props.game.allow-nether }}" type="checkbox" /> Allow Nether Portals</label>
+					<label><input bind-to="{{ craft.props.game.pvp }}" type="checkbox" /> PVP</label>
 				</div>
 			</div>
 		</div>
@@ -103,9 +103,18 @@
 		<hr/>
 		<div class="form-group">
 			<div class="col-lg-10 col-lg-offset-2">
-				<button type="submit" class="btn btn-success">Save</button>
-				<a href="#" class="btn btn-primary" on-click="save-restart">Save &amp; Restart</a>
-				<span class="help-inline">Server must be restarted for changes to take effect.</span>
+				<button type="submit" on-click="save" class="btn btn-success" disabled="{{ saving }}">
+					{{# saving }}<i class="icon icon-cog icon-spin"></i> Saving...{{/ saving }}
+					{{^ saving }}Save{{/ saving }}
+				</button>
+				{{# state:running }}
+				<button on-click="save-restart" class="btn btn-primary" disabled="{{ saving }}">Save &amp; Restart</button>
+				{{/ state:running }}
+				<span class="help-inline">
+					{{# success }}<span class="text-success">Settings saved successfully.</span>{{/ success }}
+					{{# error }}<span class="text-danger">{{ this }}</span>{{/ error }}
+					{{# normal }}Server must be restarted for changes to take effect.{{/ normal }}
+				</span>
 			</div>
 		</div>
 	</fieldset>

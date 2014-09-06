@@ -4,7 +4,7 @@ module.exports = View.extend({
 	initialize: function() {
 		this.use("actions");
 	},
-	template: require("./layout.html"),
+	template: require("../templates/console.html"),
 	defaults: {
 		placeholder: function() {
 			return this.get("craft.state") === "running" ?
@@ -55,6 +55,9 @@ module.exports = View.extend({
 				if (sticky) el.scrollTop = el.scrollHeight;
 				if (n) stick(--n);
 			}, 60);
+
+			// start at the bottom on load
+			el.scrollTop = el.scrollHeight;
 
 			return {
 				parse: false,

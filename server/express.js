@@ -21,7 +21,6 @@ if ($conf.get("env") === "development") {
 
 app.use(lessMiddleware("public/less", {
 	dest: $resolve("public"),
-	debug: true,
 	compiler: {
 		compress: false,
 		cleancss: $conf.get("env") === "production"

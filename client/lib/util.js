@@ -3,8 +3,17 @@ var _ = require("underscore"),
 
 exports.asyncSocketEvent = function(socket, event) {
 	var args = _.toArray(arguments).slice(1);
-	return new Promise(function(resolve) {
-		args.push(resolve);
+	
+	return new Promise(function(resolve, reject) {
+		args.push(function(err) {
+			if (err) return reject(err);
+			
+			var args = _.toArray(arguments).slice(1),
+				len = args.length;
+
+			resolve(!len ? void 0 : len === 1 ? args[0] : args);
+		});
+
 		socket.emit.apply(socket, args);
 	});
 }

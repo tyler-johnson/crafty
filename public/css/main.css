@@ -7341,3 +7341,7 @@ main.console pre {
   -o-tab-size: 4;
   tab-size: 4;
 }
+main.console pre hr {
+  margin: 10px 0;
+  border-top-color: #b3b3b3;
+}
