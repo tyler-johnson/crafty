@@ -2,7 +2,8 @@
 var _ = require("underscore"),
 	fs = require("fs"),
 	Promise = require("bluebird"),
-	IONamespace = require('socket.io/lib/namespace');
+	IONamespace = require('socket.io/lib/namespace'),
+	expect = require("expect.js");
 
 function noop(){}
 

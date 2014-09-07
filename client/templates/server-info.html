@@ -8,7 +8,7 @@
 			<span id="server-status">{{ humanState }}</span>
 		</div>
 	</div>
-	<h2>{{ craft.props.server.name }}</h2>
+	<h2 class="header">{{ craft.props.server.name }}</h2>
 	<div class="btn-group">
 		{{# state:stopped }}<a href="#" class="btn btn-sm btn-success btn-start" on-click="start">Start</a>{{/ state:stopped }}
 		{{# state:starting }}<a href="#" class="btn btn-sm btn-success btn-start disabled">Starting...</a>{{/ state:starting }}

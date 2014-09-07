@@ -7329,8 +7329,8 @@ fieldset {
   background-color: #d9534f;
 }
 .server-info .header {
-  margin-top: 0.5em;
-  font-weight: normal;
+  margin-top: 1em;
+  word-wrap: break-word;
 }
 .server-info .btn-group > .btn {
   min-width: 120px;
