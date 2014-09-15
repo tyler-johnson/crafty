@@ -13,13 +13,13 @@ function Craft(socket) {
 	this.feed = [];
 
 	var stateChange = _.bind(this._stateChange, this);
-	socket.on("server:state", stateChange);
-	util.asyncSocketEvent(socket, "server:state").then(stateChange);
+	socket.io.on("server:state", stateChange);
+	socket.call("server:state").then(stateChange);
 
 	var self = this;
 	
 	[ "version", "data", "line", "eula" ].forEach(function(event) {
-		socket.on("server:" + event, function() {
+		socket.io.on("server:" + event, function() {
 			var args = _.toArray(arguments);
 			args.unshift(event);
 			self.trigger.apply(self, args);
@@ -32,7 +32,7 @@ function Craft(socket) {
 
 	this.on("eula", function() {
 		if (confirm("In order to start a Minecraft Server, you must agree to Mojang's EULA (https://account.mojang.com/documents/minecraft_eula). Please click OK to confirm your agreement.")) {
-			socket.emit("accept-eula", function() {
+			socket.call("accept-eula").then(function() {
 				self.log("EULA accepted. Restarting server...", { color: "blue" });
 				self.start();
 			});
@@ -44,7 +44,7 @@ function Craft(socket) {
 	this.props.fetch().then($app.wait());
 
 	// Load old recent feed message
-	var recent = util.storage.get("recentServerFeed");
+	var recent = $app.storage.get("recentServerFeed");
 	if (_.isArray(recent) && recent.length) this.feed.push.apply(this.feed, recent);
 }
 
@@ -52,15 +52,15 @@ function Craft(socket) {
 Craft.prototype = Object.create(Backbone.Events);
 
 Craft.prototype.start = function() {
-	return util.asyncSocketEvent(this.socket, "server:start");
+	return this.socket.call("server:start");
 }
 
 Craft.prototype.stop = function(n) {
-	return util.asyncSocketEvent(this.socket, "server:stop", n);
+	return this.socket.call("server:stop", n);
 }
 
 Craft.prototype.restart = function() {
-	return util.asyncSocketEvent(this.socket, "server:restart");
+	return this.socket.call("server:restart");
 }
 
 Craft.prototype.command = function() {
@@ -73,7 +73,7 @@ Craft.prototype.command = function() {
 		time: false
 	});
 
-	return util.asyncSocketEvent(this.socket, "server:command", cmd);
+	return this.socket.call("server:command", cmd);
 }
 
 Craft.prototype.log = function(str, options) {
@@ -91,13 +91,13 @@ Craft.prototype.log = function(str, options) {
 
 Craft.prototype.clearLog = function() {
 	this.feed.splice(0, this.feed.length);
-	util.storage.set("recentServerFeed", []);
+	$app.storage.set("recentServerFeed", []);
 	return this;
 }
 
 Craft.prototype._pushFeed = function(msg) {
 	this.feed.push(msg);
-	util.storage.set("recentServerFeed", this.feed.slice(-30));
+	$app.storage.set("recentServerFeed", this.feed.slice(-30));
 	return this;
 }
 

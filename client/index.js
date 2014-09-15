@@ -11,12 +11,12 @@ require("./lib/bootstrap");
 global.View = require("temple-mustache");
 require("temple-backbone");
 
-// Load socket io
-var socket = global.$socket = require("socket.io-client")(location.origin);
-
 // load the app
 var app = global.$app = new(require("./lib/app"));
 _.extend(app, __app_runtime_variables__);
+
+// Load socket io
+var socket = global.$socket = require("./lib/socket");
 
 // create a singleton Craft instance
 global.$craft = new(require("./lib/craft"))(socket);
@@ -56,15 +56,19 @@ app.ready(function() {
 });
 
 app.route("", function() {
-	app.navigate("settings", { trigger: true, replace: true });
+	console.log("home");
 });
 
 app.route("settings", function() {
+	if (!$socket.signedin()) return app.navigate("", { trigger: true });
+
 	app.setTitle("Settings");
 	layout.set("tab", "settings");
 });
 
 app.route("console", function() {
+	if (!$socket.signedin()) return app.navigate("", { trigger: true });
+
 	app.setTitle("Console");
 	layout.set("tab", "console");
 });

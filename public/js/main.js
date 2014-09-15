@@ -13,12 +13,12 @@ require("./lib/bootstrap");
 global.View = require("temple-mustache");
 require("temple-backbone");
 
-// Load socket io
-var socket = global.$socket = require("socket.io-client")(location.origin);
-
 // load the app
 var app = global.$app = new(require("./lib/app"));
 _.extend(app, __app_runtime_variables__);
+
+// Load socket io
+var socket = global.$socket = require("./lib/socket");
 
 // create a singleton Craft instance
 global.$craft = new(require("./lib/craft"))(socket);
@@ -58,20 +58,24 @@ app.ready(function() {
 });
 
 app.route("", function() {
-	app.navigate("settings", { trigger: true, replace: true });
+	console.log("home");
 });
 
 app.route("settings", function() {
+	if (!$socket.signedin()) return app.navigate("", { trigger: true });
+
 	app.setTitle("Settings");
 	layout.set("tab", "settings");
 });
 
 app.route("console", function() {
+	if (!$socket.signedin()) return app.navigate("", { trigger: true });
+
 	app.setTitle("Console");
 	layout.set("tab", "console");
 });
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./lib/app":2,"./lib/bootstrap":3,"./lib/craft":4,"./lib/jquery_extras":5,"./lib/util":7,"./views/panel-layout":13,"backbone":16,"jquery":59,"socket.io-client":61,"temple-backbone":105,"temple-mustache":107,"underscore":131,"url":58}],2:[function(require,module,exports){
+},{"./lib/app":2,"./lib/bootstrap":3,"./lib/craft":4,"./lib/jquery_extras":5,"./lib/socket":7,"./lib/util":8,"./views/panel-layout":14,"backbone":17,"jquery":60,"temple-backbone":106,"temple-mustache":108,"underscore":132,"url":59}],2:[function(require,module,exports){
 var _ = require("underscore"),
 	path = require("path"),
 	Backbone = require("backbone"),
@@ -83,6 +87,7 @@ module.exports = Backbone.Router.extend({
 	initialize: function() {
 		this.state = "init";
 		this.initTime = new Date; // date cache for the *rough* time of launch
+		this.storage = util.storage(this.name);
 
 		this._routeDep = new Mustache.Dependency;
 		this.on("route", function() { this._routeDep.changed(); });
@@ -158,7 +163,7 @@ module.exports = Backbone.Router.extend({
 		return Backbone.Router.prototype._routeToRegExp.call(this, route);
 	}
 });
-},{"./util":7,"backbone":16,"path":52,"temple-mustache":107,"underscore":131}],3:[function(require,module,exports){
+},{"./util":8,"backbone":17,"path":53,"temple-mustache":108,"underscore":132}],3:[function(require,module,exports){
 /*!
  * Bootstrap v3.2.0 (http://getbootstrap.com)
  * Copyright 2011-2014 Twitter, Inc.
@@ -2290,13 +2295,13 @@ function Craft(socket) {
 	this.feed = [];
 
 	var stateChange = _.bind(this._stateChange, this);
-	socket.on("server:state", stateChange);
-	util.asyncSocketEvent(socket, "server:state").then(stateChange);
+	socket.io.on("server:state", stateChange);
+	socket.call("server:state").then(stateChange);
 
 	var self = this;
 	
 	[ "version", "data", "line", "eula" ].forEach(function(event) {
-		socket.on("server:" + event, function() {
+		socket.io.on("server:" + event, function() {
 			var args = _.toArray(arguments);
 			args.unshift(event);
 			self.trigger.apply(self, args);
@@ -2309,7 +2314,7 @@ function Craft(socket) {
 
 	this.on("eula", function() {
 		if (confirm("In order to start a Minecraft Server, you must agree to Mojang's EULA (https://account.mojang.com/documents/minecraft_eula). Please click OK to confirm your agreement.")) {
-			socket.emit("accept-eula", function() {
+			socket.call("accept-eula").then(function() {
 				self.log("EULA accepted. Restarting server...", { color: "blue" });
 				self.start();
 			});
@@ -2321,7 +2326,7 @@ function Craft(socket) {
 	this.props.fetch().then($app.wait());
 
 	// Load old recent feed message
-	var recent = util.storage.get("recentServerFeed");
+	var recent = $app.storage.get("recentServerFeed");
 	if (_.isArray(recent) && recent.length) this.feed.push.apply(this.feed, recent);
 }
 
@@ -2329,15 +2334,15 @@ function Craft(socket) {
 Craft.prototype = Object.create(Backbone.Events);
 
 Craft.prototype.start = function() {
-	return util.asyncSocketEvent(this.socket, "server:start");
+	return this.socket.call("server:start");
 }
 
 Craft.prototype.stop = function(n) {
-	return util.asyncSocketEvent(this.socket, "server:stop", n);
+	return this.socket.call("server:stop", n);
 }
 
 Craft.prototype.restart = function() {
-	return util.asyncSocketEvent(this.socket, "server:restart");
+	return this.socket.call("server:restart");
 }
 
 Craft.prototype.command = function() {
@@ -2350,7 +2355,7 @@ Craft.prototype.command = function() {
 		time: false
 	});
 
-	return util.asyncSocketEvent(this.socket, "server:command", cmd);
+	return this.socket.call("server:command", cmd);
 }
 
 Craft.prototype.log = function(str, options) {
@@ -2368,13 +2373,13 @@ Craft.prototype.log = function(str, options) {
 
 Craft.prototype.clearLog = function() {
 	this.feed.splice(0, this.feed.length);
-	util.storage.set("recentServerFeed", []);
+	$app.storage.set("recentServerFeed", []);
 	return this;
 }
 
 Craft.prototype._pushFeed = function(msg) {
 	this.feed.push(msg);
-	util.storage.set("recentServerFeed", this.feed.slice(-30));
+	$app.storage.set("recentServerFeed", this.feed.slice(-30));
 	return this;
 }
 
@@ -2382,7 +2387,7 @@ Craft.prototype._stateChange = function(state) {
 	this.state = state;
 	this.trigger("state", state);
 }
-},{"./props":6,"./util":7,"backbone":16,"bluebird":19,"moment":60,"underscore":131}],5:[function(require,module,exports){
+},{"./props":6,"./util":8,"backbone":17,"bluebird":20,"moment":61,"underscore":132}],5:[function(require,module,exports){
 // returns form data as object
 jQuery.fn.serializeObject = function() {
 	var json, patterns, push_counters, build, push_counter;
@@ -2508,14 +2513,14 @@ function sync(method, model, options) {
 		switch(method) {
 			case "read":
 				if (model instanceof Prop) id = model.id;
-				return util.asyncSocketEvent(socket, "props:read", id)
+				return socket.call("props:read", id)
 
 			case "create":
 				throw new Error("Cannot create.");
 
 			case "update":
 				id = model.id;
-				return util.asyncSocketEvent(socket, "props:write", id, model.toJSON());
+				return socket.call("props:write", id, model.toJSON());
 
 			case "delete":
 				throw new Error("Can't delete properties from the browser.");
@@ -2527,16 +2532,80 @@ function sync(method, model, options) {
 	model.trigger('request', model, promise, options);
 	return promise;
 }
-},{"./util":7,"backbone":16,"bluebird":19,"underscore":131}],7:[function(require,module,exports){
-var _ = require("underscore"),
-	Promise = require("bluebird");
+},{"./util":8,"backbone":17,"bluebird":20,"underscore":132}],7:[function(require,module,exports){
+var io = require("socket.io-client")(location.origin),
+	util = require("./util"),
+	Promise = require("bluebird"),
+	_ = require("underscore"),
+	Mustache = require("temple-mustache");
 
-exports.asyncSocketEvent = function(socket, event) {
+var authDep = new Mustache.Dependency();
+
+var socket =
+module.exports = {
+	io: io,
+	
+	_signedin: false,
+
+	signedin: function() {
+		authDep.depend();
+		return socket._signedin;
+	},
+	
+	signin: function(pass) {
+		return socket.call("signin", pass).then(function(res) {
+			if (!res) throw new Error("Invalid password!");
+			$app.storage.set("password", pass);
+			socket._signedin = true;
+			authDep.changed();
+			$app.trigger("signin");
+		});
+	},
+
+	signout: function() {
+		$app.storage.clear("password");
+		socket._signedin = false;
+		return socket.call("signout").finally(function() {
+			authDep.changed();
+			$app.trigger("signout");
+		});
+	},
+
+	send: function(payload) {
+		return asyncSocketEvent(io, "req", payload);
+	},
+
+	call: function(name) {
+		return socket.apply(name, _.toArray(arguments).slice(1));
+	},
+
+	apply: function(name, args) {
+		return socket.send({
+			name: name,
+			args: args
+		});
+	}
+}
+
+var lastId = null;
+
+io.on("connect", function() {
+	socket.signin($app.storage.get("password")).catch(function() {
+		$app.storage.clear("password");
+	});
+
+	socket.call("server:id").then(function(id) {
+		if (lastId == null) lastId = id;
+		if (lastId !== id) location.reload();
+	});
+});
+
+function asyncSocketEvent(socket, event) {
 	var args = _.toArray(arguments).slice(1);
 	
 	return new Promise(function(resolve, reject) {
 		args.push(function(err) {
-			if (err) return reject(err);
+			if (err != null) return reject(err);
 			
 			var args = _.toArray(arguments).slice(1),
 				len = args.length;
@@ -2547,6 +2616,8 @@ exports.asyncSocketEvent = function(socket, event) {
 		socket.emit.apply(socket, args);
 	});
 }
+},{"./util":8,"bluebird":20,"socket.io-client":62,"temple-mustache":108,"underscore":132}],8:[function(require,module,exports){
+var _ = require("underscore");
 
 exports.which = function(e) {
 	e = e || window.event;
@@ -2555,28 +2626,44 @@ exports.which = function(e) {
 		: e.which;
 }
 
-var stor =
-exports.storage = {
-	supported: window.localStorage != null,
-	get: function(key) {
-		if (!stor.supported) return;
-		var raw = window.localStorage[key];
-		return raw != null ? JSON.parse(raw) : void 0;
-	},
-	set: function(key, value) {
-		if (!stor.supported) return;
-		window.localStorage[key] = JSON.stringify(value);
+var Storage =
+exports.storage = function(namespace) {
+	var stor;
+
+	return stor = {
+		namespace: namespace,
+		key: function(k) {
+			return (_.isEmpty(stor.namespace) ? "" : stor.namespace + ":") + k;
+		},
+		get: function(k) {
+			try {
+				if (!Storage.supported) return;
+				return JSON.parse(atob(window.localStorage[stor.key(k)]));
+			} catch(e) {
+				return void 0;
+			}
+		},
+		set: function(k, value) {
+			if (!Storage.supported) return;
+			window.localStorage[stor.key(k)] = btoa(JSON.stringify(value));
+		},
+		clear: function(k) {
+			if (!Storage.supported) return;
+			delete window.localStorage[stor.key(k)];
+		}
 	}
 }
-},{"bluebird":19,"underscore":131}],8:[function(require,module,exports){
-module.exports = {"type":1,"children":[{"name":"pre","attributes":[{"type":5,"name":"style","value":"height: 500px; overflow: auto;","children":[{"type":3,"value":"height: 500px; overflow: auto;"}],"arguments":[{"type":12,"value":"height: 500px; overflow: auto;"}]},{"type":5,"name":"sticky","value":"","children":[],"arguments":[{"type":12,"value":""}]}],"type":4,"children":[{"name":"code","attributes":[],"type":4,"children":[{"type":8,"value":"craft.feed","children":[{"type":7,"value":"this"}]}]}]},{"type":3,"value":"\n\n"},{"name":"input","type":4,"attributes":[{"type":5,"name":"type","value":"text","children":[{"type":3,"value":"text"}],"arguments":[{"type":12,"value":"text"}]},{"type":5,"name":"class","value":"form-control","children":[{"type":3,"value":"form-control"}],"arguments":[{"type":12,"value":"form-control"}]},{"type":5,"name":"on-keyup","value":"submit","children":[{"type":3,"value":"submit"}],"arguments":[{"type":12,"value":"submit"}]},{"type":5,"name":"placeholder","value":"{{ placeholder }}","children":[{"type":6,"value":"placeholder"}],"arguments":[{"type":6,"value":"placeholder"}]},{"type":5,"name":"disabled","value":"","children":[],"arguments":[{"type":12,"value":""}]}],"children":[]},{"type":3,"value":" "}],"version":"1.1.0"};
-},{}],9:[function(require,module,exports){
-module.exports = {"type":1,"children":[{"name":"main","attributes":[{"type":5,"name":"class","value":"container {{ tab }}","children":[{"type":3,"value":"container "},{"type":6,"value":"tab"}],"arguments":[{"type":12,"value":"container {{ tab }}"}]}],"type":4,"children":[{"type":3,"value":"\n\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"row","children":[{"type":3,"value":"row"}],"arguments":[{"type":12,"value":"row"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"col-lg-3","children":[{"type":3,"value":"col-lg-3"}],"arguments":[{"type":12,"value":"col-lg-3"}]}],"type":4,"children":[{"type":10,"value":"sidebar"}]},{"type":3,"value":"\n\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"col-lg-9","children":[{"type":3,"value":"col-lg-9"}],"arguments":[{"type":12,"value":"col-lg-9"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t"},{"name":"ul","attributes":[{"type":5,"name":"class","value":"nav nav-tabs","children":[{"type":3,"value":"nav nav-tabs"}],"arguments":[{"type":12,"value":"nav nav-tabs"}]},{"type":5,"name":"id","value":"nav","children":[{"type":3,"value":"nav"}],"arguments":[{"type":12,"value":"nav"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t"},{"name":"li","attributes":[{"type":5,"name":"class","value":"{{# tab:settings }}active{{/ tab:settings }}","children":[{"type":8,"value":"tab:settings","children":[{"type":3,"value":"active"}]}],"arguments":[{"type":12,"value":"{{# tab:settings }}active{{/ tab:settings }}"}]}],"type":4,"children":[{"name":"a","attributes":[{"type":5,"name":"href","value":"/settings","children":[{"type":3,"value":"/settings"}],"arguments":[{"type":12,"value":"/settings"}]}],"type":4,"children":[{"name":"i","attributes":[{"type":5,"name":"class","value":"icon icon-cogs","children":[{"type":3,"value":"icon icon-cogs"}],"arguments":[{"type":12,"value":"icon icon-cogs"}]}],"type":4,"children":[]},{"type":3,"value":" Settings"}]}]},{"type":3,"value":"\n\t\t\t\t"},{"type":11,"value":"<li<%= active(\"/players\") %>><a href=\"/players\"><i class=\"icon icon-group\"></i> Players</a></li>"},{"type":3,"value":"\n\t\t\t\t"},{"name":"li","attributes":[{"type":5,"name":"class","value":"{{# tab:console }}active{{/ tab:console }}","children":[{"type":8,"value":"tab:console","children":[{"type":3,"value":"active"}]}],"arguments":[{"type":12,"value":"{{# tab:console }}active{{/ tab:console }}"}]}],"type":4,"children":[{"name":"a","attributes":[{"type":5,"name":"href","value":"/console","children":[{"type":3,"value":"/console"}],"arguments":[{"type":12,"value":"/console"}]}],"type":4,"children":[{"name":"i","attributes":[{"type":5,"name":"class","value":"icon icon-terminal","children":[{"type":3,"value":"icon icon-terminal"}],"arguments":[{"type":12,"value":"icon icon-terminal"}]}],"type":4,"children":[]},{"type":3,"value":" Console"}]}]},{"type":3,"value":"\n\t\t\t\t"},{"type":11,"value":"<li<%= active(\"/world\") %>><a href=\"/world\"><i class=\"icon icon-globe\"></i> World</a></li>"},{"type":3,"value":"\n\t\t\t"}]},{"type":3,"value":"\n\t\t\t\n\t\t\t"},{"type":8,"value":"tab:settings","children":[{"type":10,"value":"settings"}]},{"type":3,"value":"\n\t\t\t"},{"type":8,"value":"tab:console","children":[{"type":10,"value":"datafeed"}]},{"type":3,"value":"\n\t\t"}]},{"type":3,"value":"\n\t"}]},{"type":3,"value":"\n"}]}],"version":"1.1.0"};
+
+exports.storage.supported = window.localStorage != null;
+},{"underscore":132}],9:[function(require,module,exports){
+module.exports = {"type":1,"children":[{"name":"pre","attributes":[{"type":5,"name":"style","value":"height: 500px; overflow: auto;","children":[{"type":3,"value":"height: 500px; overflow: auto;"}],"arguments":[{"type":13,"value":"height: 500px; overflow: auto;"}]},{"type":5,"name":"sticky","value":"","children":[],"arguments":[{"type":13,"value":""}]}],"type":4,"children":[{"name":"code","attributes":[],"type":4,"children":[{"type":9,"value":"craft.feed","children":[{"type":8,"value":"this"}]}]}]},{"type":3,"value":"\n\n"},{"name":"input","type":4,"attributes":[{"type":5,"name":"type","value":"text","children":[{"type":3,"value":"text"}],"arguments":[{"type":13,"value":"text"}]},{"type":5,"name":"class","value":"form-control","children":[{"type":3,"value":"form-control"}],"arguments":[{"type":13,"value":"form-control"}]},{"type":5,"name":"on-keyup","value":"submit","children":[{"type":3,"value":"submit"}],"arguments":[{"type":13,"value":"submit"}]},{"type":5,"name":"placeholder","value":"{{ placeholder }}","children":[{"type":7,"value":"placeholder"}],"arguments":[{"type":7,"value":"placeholder"}]},{"type":5,"name":"disabled","value":"","children":[],"arguments":[{"type":13,"value":""}]}],"children":[]},{"type":3,"value":" "}],"version":"1.1.0"};
 },{}],10:[function(require,module,exports){
-module.exports = {"type":1,"children":[{"name":"div","attributes":[{"type":5,"name":"class","value":"server-info","children":[{"type":3,"value":"server-info"}],"arguments":[{"type":12,"value":"server-info"}]}],"type":4,"children":[{"type":3,"value":"\n\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"server-image-container","children":[{"type":3,"value":"server-image-container"}],"arguments":[{"type":12,"value":"server-image-container"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"server-image","children":[{"type":3,"value":"server-image"}],"arguments":[{"type":12,"value":"server-image"}]},{"type":5,"name":"style","value":"background-image: url('{{ craft.props.server.image }}');","children":[{"type":3,"value":"background-image: url('"},{"type":6,"value":"craft.props.server.image"},{"type":3,"value":"');"}],"arguments":[{"type":12,"value":"background-image: url('{{ craft.props.server.image }}');"}]}],"type":4,"children":[]},{"type":3,"value":"\n\t"}]},{"type":3,"value":"\n\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"server-status","children":[{"type":3,"value":"server-status"}],"arguments":[{"type":12,"value":"server-status"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"server-status-inner","children":[{"type":3,"value":"server-status-inner"}],"arguments":[{"type":12,"value":"server-status-inner"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"server-status-color","children":[{"type":3,"value":"server-status-color"}],"arguments":[{"type":12,"value":"server-status-color"}]},{"type":5,"name":"data-state","value":"{{ craft.state }}","children":[{"type":6,"value":"craft.state"}],"arguments":[{"type":6,"value":"craft.state"}]},{"type":5,"name":"id","value":"server-color","children":[{"type":3,"value":"server-color"}],"arguments":[{"type":12,"value":"server-color"}]}],"type":4,"children":[]},{"type":3,"value":"\n\t\t\t"},{"name":"span","attributes":[{"type":5,"name":"id","value":"server-status","children":[{"type":3,"value":"server-status"}],"arguments":[{"type":12,"value":"server-status"}]}],"type":4,"children":[{"type":6,"value":"humanState"}]},{"type":3,"value":"\n\t\t"}]},{"type":3,"value":"\n\t"}]},{"type":3,"value":"\n\t"},{"name":"h2","attributes":[{"type":5,"name":"class","value":"header","children":[{"type":3,"value":"header"}],"arguments":[{"type":12,"value":"header"}]}],"type":4,"children":[{"type":6,"value":"craft.props.server.name"}]},{"type":3,"value":"\n\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"btn-group","children":[{"type":3,"value":"btn-group"}],"arguments":[{"type":12,"value":"btn-group"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t"},{"type":8,"value":"state:stopped","children":[{"name":"a","attributes":[{"type":5,"name":"href","value":"#","children":[{"type":3,"value":"#"}],"arguments":[{"type":12,"value":"#"}]},{"type":5,"name":"class","value":"btn btn-sm btn-success btn-start","children":[{"type":3,"value":"btn btn-sm btn-success btn-start"}],"arguments":[{"type":12,"value":"btn btn-sm btn-success btn-start"}]},{"type":5,"name":"on-click","value":"start","children":[{"type":3,"value":"start"}],"arguments":[{"type":12,"value":"start"}]}],"type":4,"children":[{"type":3,"value":"Start"}]}]},{"type":3,"value":"\n\t\t"},{"type":8,"value":"state:starting","children":[{"name":"a","attributes":[{"type":5,"name":"href","value":"#","children":[{"type":3,"value":"#"}],"arguments":[{"type":12,"value":"#"}]},{"type":5,"name":"class","value":"btn btn-sm btn-success btn-start disabled","children":[{"type":3,"value":"btn btn-sm btn-success btn-start disabled"}],"arguments":[{"type":12,"value":"btn btn-sm btn-success btn-start disabled"}]}],"type":4,"children":[{"type":3,"value":"Starting..."}]}]},{"type":3,"value":"\n\t\t"},{"type":8,"value":"state:running","children":[{"type":3,"value":"\n\t\t\t"},{"name":"a","attributes":[{"type":5,"name":"href","value":"#","children":[{"type":3,"value":"#"}],"arguments":[{"type":12,"value":"#"}]},{"type":5,"name":"class","value":"btn btn-sm btn-danger btn-stop{{# stopTime }} disabled{{/ stopTime }}","children":[{"type":3,"value":"btn btn-sm btn-danger btn-stop"},{"type":8,"value":"stopTime","children":[{"type":3,"value":" disabled"}]}],"arguments":[{"type":12,"value":"btn btn-sm btn-danger btn-stop{{# stopTime }} disabled{{/ stopTime }}"}]},{"type":5,"name":"on-click","value":"stop","children":[{"type":3,"value":"stop"}],"arguments":[{"type":12,"value":"stop"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t"},{"type":8,"value":"stopTime","children":[{"type":3,"value":"Stopping in "},{"type":6,"value":"this"},{"type":3,"value":"..."}]},{"type":3,"value":"\n\t\t\t\t"},{"type":9,"value":"stopTime","children":[{"type":3,"value":"Stop"}]},{"type":3,"value":"\n\t\t\t"}]},{"type":3,"value":"\n\t\t"}]},{"type":3,"value":"\n\t\t"},{"type":8,"value":"state:stopping","children":[{"name":"a","attributes":[{"type":5,"name":"href","value":"#","children":[{"type":3,"value":"#"}],"arguments":[{"type":12,"value":"#"}]},{"type":5,"name":"class","value":"btn btn-sm btn-danger btn-stop disabled","children":[{"type":3,"value":"btn btn-sm btn-danger btn-stop disabled"}],"arguments":[{"type":12,"value":"btn btn-sm btn-danger btn-stop disabled"}]}],"type":4,"children":[{"type":3,"value":"Stopping..."}]}]},{"type":3,"value":"\n\t"}]},{"type":3,"value":"\n"}]}],"version":"1.1.0"};
+module.exports = {"type":1,"children":[{"name":"main","attributes":[{"type":5,"name":"class","value":"container {{ tab }}","children":[{"type":3,"value":"container "},{"type":7,"value":"tab"}],"arguments":[{"type":13,"value":"container {{ tab }}"}]}],"type":4,"children":[{"type":3,"value":"\n\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"row","children":[{"type":3,"value":"row"}],"arguments":[{"type":13,"value":"row"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"col-lg-3","children":[{"type":3,"value":"col-lg-3"}],"arguments":[{"type":13,"value":"col-lg-3"}]}],"type":4,"children":[{"type":11,"value":"sidebar"}]},{"type":3,"value":"\n\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"col-lg-9","children":[{"type":3,"value":"col-lg-9"}],"arguments":[{"type":13,"value":"col-lg-9"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t"},{"name":"ul","attributes":[{"type":5,"name":"class","value":"nav nav-tabs","children":[{"type":3,"value":"nav nav-tabs"}],"arguments":[{"type":13,"value":"nav nav-tabs"}]},{"type":5,"name":"id","value":"nav","children":[{"type":3,"value":"nav"}],"arguments":[{"type":13,"value":"nav"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t"},{"name":"li","attributes":[{"type":5,"name":"class","value":"{{# tab:settings }}active{{/ tab:settings }}","children":[{"type":9,"value":"tab:settings","children":[{"type":3,"value":"active"}]}],"arguments":[{"type":13,"value":"{{# tab:settings }}active{{/ tab:settings }}"}]}],"type":4,"children":[{"name":"a","attributes":[{"type":5,"name":"href","value":"/settings","children":[{"type":3,"value":"/settings"}],"arguments":[{"type":13,"value":"/settings"}]}],"type":4,"children":[{"name":"i","attributes":[{"type":5,"name":"class","value":"icon icon-cogs","children":[{"type":3,"value":"icon icon-cogs"}],"arguments":[{"type":13,"value":"icon icon-cogs"}]}],"type":4,"children":[]},{"type":3,"value":" Settings"}]}]},{"type":3,"value":"\n\t\t\t\t"},{"type":6,"value":"<li<%= active(\"/players\") %>><a href=\"/players\"><i class=\"icon icon-group\"></i> Players</a></li>"},{"type":3,"value":"\n\t\t\t\t"},{"name":"li","attributes":[{"type":5,"name":"class","value":"{{# tab:console }}active{{/ tab:console }}","children":[{"type":9,"value":"tab:console","children":[{"type":3,"value":"active"}]}],"arguments":[{"type":13,"value":"{{# tab:console }}active{{/ tab:console }}"}]}],"type":4,"children":[{"name":"a","attributes":[{"type":5,"name":"href","value":"/console","children":[{"type":3,"value":"/console"}],"arguments":[{"type":13,"value":"/console"}]}],"type":4,"children":[{"name":"i","attributes":[{"type":5,"name":"class","value":"icon icon-terminal","children":[{"type":3,"value":"icon icon-terminal"}],"arguments":[{"type":13,"value":"icon icon-terminal"}]}],"type":4,"children":[]},{"type":3,"value":" Console"}]}]},{"type":3,"value":"\n\t\t\t\t"},{"type":6,"value":"<li<%= active(\"/world\") %>><a href=\"/world\"><i class=\"icon icon-globe\"></i> World</a></li>"},{"type":3,"value":"\n\t\t\t"}]},{"type":3,"value":"\n\t\t\t\n\t\t\t"},{"type":9,"value":"tab:settings","children":[{"type":11,"value":"settings"}]},{"type":3,"value":"\n\t\t\t"},{"type":9,"value":"tab:console","children":[{"type":11,"value":"datafeed"}]},{"type":3,"value":"\n\t\t"}]},{"type":3,"value":"\n\t"}]},{"type":3,"value":"\n"}]}],"version":"1.1.0"};
 },{}],11:[function(require,module,exports){
-module.exports = {"type":1,"children":[{"name":"form","attributes":[{"type":5,"name":"class","value":"form-horizontal","children":[{"type":3,"value":"form-horizontal"}],"arguments":[{"type":12,"value":"form-horizontal"}]}],"type":4,"children":[{"type":3,"value":"\n\t"},{"name":"fieldset","attributes":[],"type":4,"children":[{"type":3,"value":"\n\t\t"},{"name":"legend","attributes":[],"type":4,"children":[{"type":3,"value":"General"}]},{"type":3,"value":"\n\n\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"form-group","children":[{"type":3,"value":"form-group"}],"arguments":[{"type":12,"value":"form-group"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t"},{"name":"label","attributes":[{"type":5,"name":"class","value":"control-label col-lg-2","children":[{"type":3,"value":"control-label col-lg-2"}],"arguments":[{"type":12,"value":"control-label col-lg-2"}]},{"type":5,"name":"for","value":"inputName","children":[{"type":3,"value":"inputName"}],"arguments":[{"type":12,"value":"inputName"}]}],"type":4,"children":[{"type":3,"value":"Name"}]},{"type":3,"value":"\n\t\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"col-lg-10","children":[{"type":3,"value":"col-lg-10"}],"arguments":[{"type":12,"value":"col-lg-10"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t"},{"name":"input","type":4,"attributes":[{"type":5,"name":"type","value":"text","children":[{"type":3,"value":"text"}],"arguments":[{"type":12,"value":"text"}]},{"type":5,"name":"class","value":"form-control","children":[{"type":3,"value":"form-control"}],"arguments":[{"type":12,"value":"form-control"}]},{"type":5,"name":"id","value":"inputName","children":[{"type":3,"value":"inputName"}],"arguments":[{"type":12,"value":"inputName"}]},{"type":5,"name":"bind-to","value":"{{ craft.props.server.name }}","children":[{"type":6,"value":"craft.props.server.name"}],"arguments":[{"type":6,"value":"craft.props.server.name"}]}],"children":[]},{"type":3,"value":"\n\t\t\t"}]},{"type":3,"value":"\n\t\t"}]},{"type":3,"value":"\n\n\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"form-group","children":[{"type":3,"value":"form-group"}],"arguments":[{"type":12,"value":"form-group"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t"},{"name":"label","attributes":[{"type":5,"name":"class","value":"control-label col-lg-2","children":[{"type":3,"value":"control-label col-lg-2"}],"arguments":[{"type":12,"value":"control-label col-lg-2"}]},{"type":5,"name":"for","value":"inputImage","children":[{"type":3,"value":"inputImage"}],"arguments":[{"type":12,"value":"inputImage"}]}],"type":4,"children":[{"type":3,"value":"Image URL"}]},{"type":3,"value":"\n\t\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"col-lg-10","children":[{"type":3,"value":"col-lg-10"}],"arguments":[{"type":12,"value":"col-lg-10"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t"},{"name":"input","type":4,"attributes":[{"type":5,"name":"type","value":"text","children":[{"type":3,"value":"text"}],"arguments":[{"type":12,"value":"text"}]},{"type":5,"name":"class","value":"form-control","children":[{"type":3,"value":"form-control"}],"arguments":[{"type":12,"value":"form-control"}]},{"type":5,"name":"id","value":"inputImage","children":[{"type":3,"value":"inputImage"}],"arguments":[{"type":12,"value":"inputImage"}]},{"type":5,"name":"bind-to","value":"{{ craft.props.server.image }}","children":[{"type":6,"value":"craft.props.server.image"}],"arguments":[{"type":6,"value":"craft.props.server.image"}]}],"children":[]},{"type":3,"value":"\n\t\t\t"}]},{"type":3,"value":"\n\t\t"}]},{"type":3,"value":"\n\n\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"form-group","children":[{"type":3,"value":"form-group"}],"arguments":[{"type":12,"value":"form-group"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t"},{"name":"label","attributes":[{"type":5,"name":"class","value":"control-label col-lg-2","children":[{"type":3,"value":"control-label col-lg-2"}],"arguments":[{"type":12,"value":"control-label col-lg-2"}]},{"type":5,"name":"for","value":"selectVersion","children":[{"type":3,"value":"selectVersion"}],"arguments":[{"type":12,"value":"selectVersion"}]}],"type":4,"children":[{"type":3,"value":"Minecraft Version"}]},{"type":3,"value":"\n\t\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"col-lg-3","children":[{"type":3,"value":"col-lg-3"}],"arguments":[{"type":12,"value":"col-lg-3"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t"},{"name":"select","attributes":[{"type":5,"name":"bind-to","value":"{{ server.version }}","children":[{"type":6,"value":"server.version"}],"arguments":[{"type":6,"value":"server.version"}]},{"type":5,"name":"id","value":"selectVersion","children":[{"type":3,"value":"selectVersion"}],"arguments":[{"type":12,"value":"selectVersion"}]},{"type":5,"name":"class","value":"form-control","children":[{"type":3,"value":"form-control"}],"arguments":[{"type":12,"value":"form-control"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t\t"},{"type":8,"value":"mcversions","children":[{"type":3,"value":"\n\t\t\t\t\t"},{"name":"option","attributes":[{"type":5,"name":"value","value":"{{ this }}","children":[{"type":6,"value":"this"}],"arguments":[{"type":6,"value":"this"}]}],"type":4,"children":[{"type":6,"value":"this"}]},{"type":3,"value":"\n\t\t\t\t\t"}]},{"type":3,"value":"\n\t\t\t\t"}]},{"type":3,"value":"\n\t\t\t"}]},{"type":3,"value":"\n\t\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"col-lg-7","children":[{"type":3,"value":"col-lg-7"}],"arguments":[{"type":12,"value":"col-lg-7"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t"},{"name":"p","attributes":[{"type":5,"name":"class","value":"help-block","children":[{"type":3,"value":"help-block"}],"arguments":[{"type":12,"value":"help-block"}]}],"type":4,"children":[{"type":3,"value":"If changed, the server executable will be replaced on the next launch."}]},{"type":3,"value":"\n\t\t\t"}]},{"type":3,"value":"\n\t\t"}]},{"type":3,"value":"\n\t"}]},{"type":3,"value":"\n\n\t"},{"name":"fieldset","attributes":[],"type":4,"children":[{"type":3,"value":"\n\t\t"},{"name":"legend","attributes":[],"type":4,"children":[{"type":3,"value":"Server"}]},{"type":3,"value":"\n\n\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"form-group","children":[{"type":3,"value":"form-group"}],"arguments":[{"type":12,"value":"form-group"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t"},{"name":"label","attributes":[{"type":5,"name":"class","value":"control-label col-lg-2","children":[{"type":3,"value":"control-label col-lg-2"}],"arguments":[{"type":12,"value":"control-label col-lg-2"}]},{"type":5,"name":"for","value":"inputMOTD","children":[{"type":3,"value":"inputMOTD"}],"arguments":[{"type":12,"value":"inputMOTD"}]}],"type":4,"children":[{"type":3,"value":"Welcome Text"}]},{"type":3,"value":"\n\t\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"col-lg-8","children":[{"type":3,"value":"col-lg-8"}],"arguments":[{"type":12,"value":"col-lg-8"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t"},{"name":"input","type":4,"attributes":[{"type":5,"name":"type","value":"text","children":[{"type":3,"value":"text"}],"arguments":[{"type":12,"value":"text"}]},{"type":5,"name":"class","value":"form-control","children":[{"type":3,"value":"form-control"}],"arguments":[{"type":12,"value":"form-control"}]},{"type":5,"name":"id","value":"inputMOTD","children":[{"type":3,"value":"inputMOTD"}],"arguments":[{"type":12,"value":"inputMOTD"}]},{"type":5,"name":"maxlength","value":"59","children":[{"type":3,"value":"59"}],"arguments":[{"type":12,"value":59}]},{"type":5,"name":"bind-to","value":"{{ craft.props.game.motd }}","children":[{"type":6,"value":"craft.props.game.motd"}],"arguments":[{"type":6,"value":"craft.props.game.motd"}]}],"children":[]},{"type":3,"value":"\n\t\t\t"}]},{"type":3,"value":"\n\t\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"col-lg-2","children":[{"type":3,"value":"col-lg-2"}],"arguments":[{"type":12,"value":"col-lg-2"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t"},{"name":"p","attributes":[{"type":5,"name":"class","value":"help-block","children":[{"type":3,"value":"help-block"}],"arguments":[{"type":12,"value":"help-block"}]}],"type":4,"children":[{"type":6,"value":"motd_count"},{"type":3,"value":" / 59"}]},{"type":3,"value":"\n\t\t\t"}]},{"type":3,"value":"\n\t\t"}]},{"type":3,"value":"\n\n\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"form-group","children":[{"type":3,"value":"form-group"}],"arguments":[{"type":12,"value":"form-group"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t"},{"name":"label","attributes":[{"type":5,"name":"class","value":"control-label col-lg-2","children":[{"type":3,"value":"control-label col-lg-2"}],"arguments":[{"type":12,"value":"control-label col-lg-2"}]},{"type":5,"name":"for","value":"selectGameDifficulty","children":[{"type":3,"value":"selectGameDifficulty"}],"arguments":[{"type":12,"value":"selectGameDifficulty"}]}],"type":4,"children":[{"type":3,"value":"Difficulty"}]},{"type":3,"value":"\n\t\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"col-lg-3","children":[{"type":3,"value":"col-lg-3"}],"arguments":[{"type":12,"value":"col-lg-3"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t"},{"name":"select","attributes":[{"type":5,"name":"bind-to","value":"{{ craft.props.game.difficulty }}","children":[{"type":6,"value":"craft.props.game.difficulty"}],"arguments":[{"type":6,"value":"craft.props.game.difficulty"}]},{"type":5,"name":"id","value":"selectGameDifficulty","children":[{"type":3,"value":"selectGameDifficulty"}],"arguments":[{"type":12,"value":"selectGameDifficulty"}]},{"type":5,"name":"class","value":"form-control","children":[{"type":3,"value":"form-control"}],"arguments":[{"type":12,"value":"form-control"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t\t"},{"name":"option","attributes":[{"type":5,"name":"value","value":"0","children":[{"type":3,"value":"0"}],"arguments":[{"type":12,"value":0}]}],"type":4,"children":[{"type":3,"value":"Peaceful"}]},{"type":3,"value":"\n\t\t\t\t\t"},{"name":"option","attributes":[{"type":5,"name":"value","value":"1","children":[{"type":3,"value":"1"}],"arguments":[{"type":12,"value":1}]}],"type":4,"children":[{"type":3,"value":"Easy"}]},{"type":3,"value":"\n\t\t\t\t\t"},{"name":"option","attributes":[{"type":5,"name":"value","value":"2","children":[{"type":3,"value":"2"}],"arguments":[{"type":12,"value":2}]}],"type":4,"children":[{"type":3,"value":"Normal"}]},{"type":3,"value":"\n\t\t\t\t\t"},{"name":"option","attributes":[{"type":5,"name":"value","value":"3","children":[{"type":3,"value":"3"}],"arguments":[{"type":12,"value":3}]}],"type":4,"children":[{"type":3,"value":"Hard"}]},{"type":3,"value":"\n\t\t\t\t"}]},{"type":3,"value":"\n\t\t\t"}]},{"type":3,"value":"\n\t\t"}]},{"type":3,"value":"\n\n\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"form-group","children":[{"type":3,"value":"form-group"}],"arguments":[{"type":12,"value":"form-group"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t"},{"name":"label","attributes":[{"type":5,"name":"class","value":"control-label col-lg-2","children":[{"type":3,"value":"control-label col-lg-2"}],"arguments":[{"type":12,"value":"control-label col-lg-2"}]},{"type":5,"name":"for","value":"selectGameMode","children":[{"type":3,"value":"selectGameMode"}],"arguments":[{"type":12,"value":"selectGameMode"}]}],"type":4,"children":[{"type":3,"value":"Game Mode"}]},{"type":3,"value":"\n\t\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"col-lg-3","children":[{"type":3,"value":"col-lg-3"}],"arguments":[{"type":12,"value":"col-lg-3"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t"},{"name":"select","attributes":[{"type":5,"name":"bind-to","value":"{{ craft.props.game.gamemode }}","children":[{"type":6,"value":"craft.props.game.gamemode"}],"arguments":[{"type":6,"value":"craft.props.game.gamemode"}]},{"type":5,"name":"id","value":"selectGameMode","children":[{"type":3,"value":"selectGameMode"}],"arguments":[{"type":12,"value":"selectGameMode"}]},{"type":5,"name":"class","value":"form-control","children":[{"type":3,"value":"form-control"}],"arguments":[{"type":12,"value":"form-control"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t\t"},{"name":"option","attributes":[{"type":5,"name":"value","value":"0","children":[{"type":3,"value":"0"}],"arguments":[{"type":12,"value":0}]}],"type":4,"children":[{"type":3,"value":"Survival"}]},{"type":3,"value":"\n\t\t\t\t\t"},{"name":"option","attributes":[{"type":5,"name":"value","value":"1","children":[{"type":3,"value":"1"}],"arguments":[{"type":12,"value":1}]}],"type":4,"children":[{"type":3,"value":"Creative"}]},{"type":3,"value":"\n\t\t\t\t\t"},{"name":"option","attributes":[{"type":5,"name":"value","value":"2","children":[{"type":3,"value":"2"}],"arguments":[{"type":12,"value":2}]}],"type":4,"children":[{"type":3,"value":"Adventure"}]},{"type":3,"value":"\n\t\t\t\t\t"},{"name":"option","attributes":[{"type":5,"name":"value","value":"3","children":[{"type":3,"value":"3"}],"arguments":[{"type":12,"value":3}]}],"type":4,"children":[{"type":3,"value":"Spectator"}]},{"type":3,"value":"\n\t\t\t\t"}]},{"type":3,"value":"\n\t\t\t"}]},{"type":3,"value":"\n\t\t"}]},{"type":3,"value":"\n\n\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"form-group","children":[{"type":3,"value":"form-group"}],"arguments":[{"type":12,"value":"form-group"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t"},{"name":"label","attributes":[{"type":5,"name":"class","value":"control-label col-lg-2","children":[{"type":3,"value":"control-label col-lg-2"}],"arguments":[{"type":12,"value":"control-label col-lg-2"}]},{"type":5,"name":"for","value":"inputGameMaxPlayers","children":[{"type":3,"value":"inputGameMaxPlayers"}],"arguments":[{"type":12,"value":"inputGameMaxPlayers"}]}],"type":4,"children":[{"type":3,"value":"Max Players"}]},{"type":3,"value":"\n\t\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"col-lg-3","children":[{"type":3,"value":"col-lg-3"}],"arguments":[{"type":12,"value":"col-lg-3"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t"},{"name":"input","type":4,"attributes":[{"type":5,"name":"type","value":"number","children":[{"type":3,"value":"number"}],"arguments":[{"type":12,"value":"number"}]},{"type":5,"name":"class","value":"form-control","children":[{"type":3,"value":"form-control"}],"arguments":[{"type":12,"value":"form-control"}]},{"type":5,"name":"id","value":"inputGameMaxPlayers","children":[{"type":3,"value":"inputGameMaxPlayers"}],"arguments":[{"type":12,"value":"inputGameMaxPlayers"}]},{"type":5,"name":"bind-to","value":"{{ craft.props.game.max-players }}","children":[{"type":6,"value":"craft.props.game.max-players"}],"arguments":[{"type":6,"value":"craft.props.game.max-players"}]}],"children":[]},{"type":3,"value":"\n\t\t\t"}]},{"type":3,"value":"\n\t\t"}]},{"type":3,"value":"\n\n\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"form-group","children":[{"type":3,"value":"form-group"}],"arguments":[{"type":12,"value":"form-group"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t"},{"name":"label","attributes":[{"type":5,"name":"class","value":"control-label col-lg-2","children":[{"type":3,"value":"control-label col-lg-2"}],"arguments":[{"type":12,"value":"control-label col-lg-2"}]}],"type":4,"children":[{"type":3,"value":"Spawn"}]},{"type":3,"value":"\n\t\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"col-lg-10","children":[{"type":3,"value":"col-lg-10"}],"arguments":[{"type":12,"value":"col-lg-10"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"checkbox","children":[{"type":3,"value":"checkbox"}],"arguments":[{"type":12,"value":"checkbox"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t\t"},{"name":"label","attributes":[],"type":4,"children":[{"name":"input","type":4,"attributes":[{"type":5,"name":"bind-to","value":"{{ craft.props.game.generate-structures }}","children":[{"type":6,"value":"craft.props.game.generate-structures"}],"arguments":[{"type":6,"value":"craft.props.game.generate-structures"}]},{"type":5,"name":"type","value":"checkbox","children":[{"type":3,"value":"checkbox"}],"arguments":[{"type":12,"value":"checkbox"}]}],"children":[]},{"type":3,"value":" Structures"}]},{"type":3,"value":"\n\t\t\t\t\t"},{"name":"label","attributes":[],"type":4,"children":[{"name":"input","type":4,"attributes":[{"type":5,"name":"bind-to","value":"{{ craft.props.game.spawn-animals }}","children":[{"type":6,"value":"craft.props.game.spawn-animals"}],"arguments":[{"type":6,"value":"craft.props.game.spawn-animals"}]},{"type":5,"name":"type","value":"checkbox","children":[{"type":3,"value":"checkbox"}],"arguments":[{"type":12,"value":"checkbox"}]}],"children":[]},{"type":3,"value":" Animals"}]},{"type":3,"value":"\n\t\t\t\t\t"},{"name":"label","attributes":[],"type":4,"children":[{"name":"input","type":4,"attributes":[{"type":5,"name":"bind-to","value":"{{ craft.props.game.spawn-monsters }}","children":[{"type":6,"value":"craft.props.game.spawn-monsters"}],"arguments":[{"type":6,"value":"craft.props.game.spawn-monsters"}]},{"type":5,"name":"type","value":"checkbox","children":[{"type":3,"value":"checkbox"}],"arguments":[{"type":12,"value":"checkbox"}]}],"children":[]},{"type":3,"value":" Monsters"}]},{"type":3,"value":"\n\t\t\t\t\t"},{"name":"label","attributes":[],"type":4,"children":[{"name":"input","type":4,"attributes":[{"type":5,"name":"bind-to","value":"{{ craft.props.game.spawn-npcs }}","children":[{"type":6,"value":"craft.props.game.spawn-npcs"}],"arguments":[{"type":6,"value":"craft.props.game.spawn-npcs"}]},{"type":5,"name":"type","value":"checkbox","children":[{"type":3,"value":"checkbox"}],"arguments":[{"type":12,"value":"checkbox"}]}],"children":[]},{"type":3,"value":" NPCs"}]},{"type":3,"value":"\n\t\t\t\t"}]},{"type":3,"value":"\n\t\t\t"}]},{"type":3,"value":"\n\t\t"}]},{"type":3,"value":"\n\n\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"form-group","children":[{"type":3,"value":"form-group"}],"arguments":[{"type":12,"value":"form-group"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t"},{"name":"label","attributes":[{"type":5,"name":"class","value":"control-label col-lg-2","children":[{"type":3,"value":"control-label col-lg-2"}],"arguments":[{"type":12,"value":"control-label col-lg-2"}]}],"type":4,"children":[{"type":3,"value":"Misc"}]},{"type":3,"value":"\n\t\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"col-lg-10","children":[{"type":3,"value":"col-lg-10"}],"arguments":[{"type":12,"value":"col-lg-10"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"checkbox","children":[{"type":3,"value":"checkbox"}],"arguments":[{"type":12,"value":"checkbox"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t\t"},{"name":"label","attributes":[],"type":4,"children":[{"name":"input","type":4,"attributes":[{"type":5,"name":"bind-to","value":"{{ craft.props.game.allow-flight }}","children":[{"type":6,"value":"craft.props.game.allow-flight"}],"arguments":[{"type":6,"value":"craft.props.game.allow-flight"}]},{"type":5,"name":"type","value":"checkbox","children":[{"type":3,"value":"checkbox"}],"arguments":[{"type":12,"value":"checkbox"}]}],"children":[]},{"type":3,"value":" Enable Flight"}]},{"type":3,"value":"\n\t\t\t\t\t"},{"name":"label","attributes":[],"type":4,"children":[{"name":"input","type":4,"attributes":[{"type":5,"name":"bind-to","value":"{{ craft.props.game.allow-nether }}","children":[{"type":6,"value":"craft.props.game.allow-nether"}],"arguments":[{"type":6,"value":"craft.props.game.allow-nether"}]},{"type":5,"name":"type","value":"checkbox","children":[{"type":3,"value":"checkbox"}],"arguments":[{"type":12,"value":"checkbox"}]}],"children":[]},{"type":3,"value":" Allow Nether Portals"}]},{"type":3,"value":"\n\t\t\t\t\t"},{"name":"label","attributes":[],"type":4,"children":[{"name":"input","type":4,"attributes":[{"type":5,"name":"bind-to","value":"{{ craft.props.game.pvp }}","children":[{"type":6,"value":"craft.props.game.pvp"}],"arguments":[{"type":6,"value":"craft.props.game.pvp"}]},{"type":5,"name":"type","value":"checkbox","children":[{"type":3,"value":"checkbox"}],"arguments":[{"type":12,"value":"checkbox"}]}],"children":[]},{"type":3,"value":" PVP"}]},{"type":3,"value":"\n\t\t\t\t"}]},{"type":3,"value":"\n\t\t\t"}]},{"type":3,"value":"\n\t\t"}]},{"type":3,"value":"\n\t"}]},{"type":3,"value":"\n\n\t"},{"name":"fieldset","attributes":[],"type":4,"children":[{"type":3,"value":"\n\t\t"},{"name":"hr","type":4,"attributes":[],"children":[]},{"type":3,"value":"\n\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"form-group","children":[{"type":3,"value":"form-group"}],"arguments":[{"type":12,"value":"form-group"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"col-lg-10 col-lg-offset-2","children":[{"type":3,"value":"col-lg-10 col-lg-offset-2"}],"arguments":[{"type":12,"value":"col-lg-10 col-lg-offset-2"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t"},{"name":"button","attributes":[{"type":5,"name":"type","value":"submit","children":[{"type":3,"value":"submit"}],"arguments":[{"type":12,"value":"submit"}]},{"type":5,"name":"on-click","value":"save","children":[{"type":3,"value":"save"}],"arguments":[{"type":12,"value":"save"}]},{"type":5,"name":"class","value":"btn btn-success","children":[{"type":3,"value":"btn btn-success"}],"arguments":[{"type":12,"value":"btn btn-success"}]},{"type":5,"name":"disabled","value":"{{ saving }}","children":[{"type":6,"value":"saving"}],"arguments":[{"type":6,"value":"saving"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t\t"},{"type":8,"value":"saving","children":[{"name":"i","attributes":[{"type":5,"name":"class","value":"icon icon-cog icon-spin","children":[{"type":3,"value":"icon icon-cog icon-spin"}],"arguments":[{"type":12,"value":"icon icon-cog icon-spin"}]}],"type":4,"children":[]},{"type":3,"value":" Saving..."}]},{"type":3,"value":"\n\t\t\t\t\t"},{"type":9,"value":"saving","children":[{"type":3,"value":"Save"}]},{"type":3,"value":"\n\t\t\t\t"}]},{"type":3,"value":"\n\t\t\t\t"},{"type":8,"value":"state:running","children":[{"type":3,"value":"\n\t\t\t\t"},{"name":"button","attributes":[{"type":5,"name":"on-click","value":"save-restart","children":[{"type":3,"value":"save-restart"}],"arguments":[{"type":12,"value":"save-restart"}]},{"type":5,"name":"class","value":"btn btn-primary","children":[{"type":3,"value":"btn btn-primary"}],"arguments":[{"type":12,"value":"btn btn-primary"}]},{"type":5,"name":"disabled","value":"{{ saving }}","children":[{"type":6,"value":"saving"}],"arguments":[{"type":6,"value":"saving"}]}],"type":4,"children":[{"type":3,"value":"Save &amp; Restart"}]},{"type":3,"value":"\n\t\t\t\t"}]},{"type":3,"value":"\n\t\t\t\t"},{"name":"span","attributes":[{"type":5,"name":"class","value":"help-inline","children":[{"type":3,"value":"help-inline"}],"arguments":[{"type":12,"value":"help-inline"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t\t"},{"type":8,"value":"success","children":[{"name":"span","attributes":[{"type":5,"name":"class","value":"text-success","children":[{"type":3,"value":"text-success"}],"arguments":[{"type":12,"value":"text-success"}]}],"type":4,"children":[{"type":3,"value":"Settings saved successfully."}]}]},{"type":3,"value":"\n\t\t\t\t\t"},{"type":8,"value":"error","children":[{"name":"span","attributes":[{"type":5,"name":"class","value":"text-danger","children":[{"type":3,"value":"text-danger"}],"arguments":[{"type":12,"value":"text-danger"}]}],"type":4,"children":[{"type":6,"value":"this"}]}]},{"type":3,"value":"\n\t\t\t\t\t"},{"type":8,"value":"normal","children":[{"type":3,"value":"Server must be restarted for changes to take effect."}]},{"type":3,"value":"\n\t\t\t\t"}]},{"type":3,"value":"\n\t\t\t"}]},{"type":3,"value":"\n\t\t"}]},{"type":3,"value":"\n\t"}]},{"type":3,"value":"\n"}]}],"version":"1.1.0"};
+module.exports = {"type":1,"children":[{"name":"div","attributes":[{"type":5,"name":"class","value":"server-info","children":[{"type":3,"value":"server-info"}],"arguments":[{"type":13,"value":"server-info"}]}],"type":4,"children":[{"type":3,"value":"\n\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"server-image-container","children":[{"type":3,"value":"server-image-container"}],"arguments":[{"type":13,"value":"server-image-container"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"server-image","children":[{"type":3,"value":"server-image"}],"arguments":[{"type":13,"value":"server-image"}]},{"type":5,"name":"style","value":"background-image: url('{{ craft.props.server.image }}');","children":[{"type":3,"value":"background-image: url('"},{"type":7,"value":"craft.props.server.image"},{"type":3,"value":"');"}],"arguments":[{"type":13,"value":"background-image: url('{{ craft.props.server.image }}');"}]}],"type":4,"children":[]},{"type":3,"value":"\n\t"}]},{"type":3,"value":"\n\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"server-status","children":[{"type":3,"value":"server-status"}],"arguments":[{"type":13,"value":"server-status"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"server-status-inner","children":[{"type":3,"value":"server-status-inner"}],"arguments":[{"type":13,"value":"server-status-inner"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"server-status-color","children":[{"type":3,"value":"server-status-color"}],"arguments":[{"type":13,"value":"server-status-color"}]},{"type":5,"name":"data-state","value":"{{ craft.state }}","children":[{"type":7,"value":"craft.state"}],"arguments":[{"type":7,"value":"craft.state"}]},{"type":5,"name":"id","value":"server-color","children":[{"type":3,"value":"server-color"}],"arguments":[{"type":13,"value":"server-color"}]}],"type":4,"children":[]},{"type":3,"value":"\n\t\t\t"},{"name":"span","attributes":[{"type":5,"name":"id","value":"server-status","children":[{"type":3,"value":"server-status"}],"arguments":[{"type":13,"value":"server-status"}]}],"type":4,"children":[{"type":7,"value":"humanState"}]},{"type":3,"value":"\n\t\t"}]},{"type":3,"value":"\n\t"}]},{"type":3,"value":"\n\t"},{"name":"h2","attributes":[{"type":5,"name":"class","value":"header","children":[{"type":3,"value":"header"}],"arguments":[{"type":13,"value":"header"}]}],"type":4,"children":[{"type":7,"value":"craft.props.server.name"}]},{"type":3,"value":"\n\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"btn-group","children":[{"type":3,"value":"btn-group"}],"arguments":[{"type":13,"value":"btn-group"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t"},{"type":9,"value":"state:stopped","children":[{"name":"a","attributes":[{"type":5,"name":"href","value":"#","children":[{"type":3,"value":"#"}],"arguments":[{"type":13,"value":"#"}]},{"type":5,"name":"class","value":"btn btn-sm btn-success btn-start","children":[{"type":3,"value":"btn btn-sm btn-success btn-start"}],"arguments":[{"type":13,"value":"btn btn-sm btn-success btn-start"}]},{"type":5,"name":"on-click","value":"start","children":[{"type":3,"value":"start"}],"arguments":[{"type":13,"value":"start"}]}],"type":4,"children":[{"type":3,"value":"Start"}]}]},{"type":3,"value":"\n\t\t"},{"type":9,"value":"state:starting","children":[{"name":"a","attributes":[{"type":5,"name":"href","value":"#","children":[{"type":3,"value":"#"}],"arguments":[{"type":13,"value":"#"}]},{"type":5,"name":"class","value":"btn btn-sm btn-success btn-start disabled","children":[{"type":3,"value":"btn btn-sm btn-success btn-start disabled"}],"arguments":[{"type":13,"value":"btn btn-sm btn-success btn-start disabled"}]}],"type":4,"children":[{"type":3,"value":"Starting..."}]}]},{"type":3,"value":"\n\t\t"},{"type":9,"value":"state:running","children":[{"type":3,"value":"\n\t\t\t"},{"name":"a","attributes":[{"type":5,"name":"href","value":"#","children":[{"type":3,"value":"#"}],"arguments":[{"type":13,"value":"#"}]},{"type":5,"name":"class","value":"btn btn-sm btn-danger btn-stop{{# stopTime }} disabled{{/ stopTime }}","children":[{"type":3,"value":"btn btn-sm btn-danger btn-stop"},{"type":9,"value":"stopTime","children":[{"type":3,"value":" disabled"}]}],"arguments":[{"type":13,"value":"btn btn-sm btn-danger btn-stop{{# stopTime }} disabled{{/ stopTime }}"}]},{"type":5,"name":"on-click","value":"stop","children":[{"type":3,"value":"stop"}],"arguments":[{"type":13,"value":"stop"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t"},{"type":9,"value":"stopTime","children":[{"type":3,"value":"Stopping in "},{"type":7,"value":"this"},{"type":3,"value":"..."}]},{"type":3,"value":"\n\t\t\t\t"},{"type":10,"value":"stopTime","children":[{"type":3,"value":"Stop"}]},{"type":3,"value":"\n\t\t\t"}]},{"type":3,"value":"\n\t\t"}]},{"type":3,"value":"\n\t\t"},{"type":9,"value":"state:stopping","children":[{"name":"a","attributes":[{"type":5,"name":"href","value":"#","children":[{"type":3,"value":"#"}],"arguments":[{"type":13,"value":"#"}]},{"type":5,"name":"class","value":"btn btn-sm btn-danger btn-stop disabled","children":[{"type":3,"value":"btn btn-sm btn-danger btn-stop disabled"}],"arguments":[{"type":13,"value":"btn btn-sm btn-danger btn-stop disabled"}]}],"type":4,"children":[{"type":3,"value":"Stopping..."}]}]},{"type":3,"value":"\n\t"}]},{"type":3,"value":"\n"}]}],"version":"1.1.0"};
 },{}],12:[function(require,module,exports){
+module.exports = {"type":1,"children":[{"name":"form","attributes":[{"type":5,"name":"class","value":"form-horizontal","children":[{"type":3,"value":"form-horizontal"}],"arguments":[{"type":13,"value":"form-horizontal"}]}],"type":4,"children":[{"type":3,"value":"\n\t"},{"name":"fieldset","attributes":[],"type":4,"children":[{"type":3,"value":"\n\t\t"},{"name":"legend","attributes":[],"type":4,"children":[{"type":3,"value":"General"}]},{"type":3,"value":"\n\n\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"form-group","children":[{"type":3,"value":"form-group"}],"arguments":[{"type":13,"value":"form-group"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t"},{"name":"label","attributes":[{"type":5,"name":"class","value":"control-label col-lg-2","children":[{"type":3,"value":"control-label col-lg-2"}],"arguments":[{"type":13,"value":"control-label col-lg-2"}]},{"type":5,"name":"for","value":"inputName","children":[{"type":3,"value":"inputName"}],"arguments":[{"type":13,"value":"inputName"}]}],"type":4,"children":[{"type":3,"value":"Name"}]},{"type":3,"value":"\n\t\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"col-lg-10","children":[{"type":3,"value":"col-lg-10"}],"arguments":[{"type":13,"value":"col-lg-10"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t"},{"name":"input","type":4,"attributes":[{"type":5,"name":"type","value":"text","children":[{"type":3,"value":"text"}],"arguments":[{"type":13,"value":"text"}]},{"type":5,"name":"class","value":"form-control","children":[{"type":3,"value":"form-control"}],"arguments":[{"type":13,"value":"form-control"}]},{"type":5,"name":"id","value":"inputName","children":[{"type":3,"value":"inputName"}],"arguments":[{"type":13,"value":"inputName"}]},{"type":5,"name":"bind-to","value":"{{ craft.props.server.name }}","children":[{"type":7,"value":"craft.props.server.name"}],"arguments":[{"type":7,"value":"craft.props.server.name"}]}],"children":[]},{"type":3,"value":"\n\t\t\t"}]},{"type":3,"value":"\n\t\t"}]},{"type":3,"value":"\n\n\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"form-group","children":[{"type":3,"value":"form-group"}],"arguments":[{"type":13,"value":"form-group"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t"},{"name":"label","attributes":[{"type":5,"name":"class","value":"control-label col-lg-2","children":[{"type":3,"value":"control-label col-lg-2"}],"arguments":[{"type":13,"value":"control-label col-lg-2"}]},{"type":5,"name":"for","value":"inputImage","children":[{"type":3,"value":"inputImage"}],"arguments":[{"type":13,"value":"inputImage"}]}],"type":4,"children":[{"type":3,"value":"Image URL"}]},{"type":3,"value":"\n\t\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"col-lg-10","children":[{"type":3,"value":"col-lg-10"}],"arguments":[{"type":13,"value":"col-lg-10"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t"},{"name":"input","type":4,"attributes":[{"type":5,"name":"type","value":"text","children":[{"type":3,"value":"text"}],"arguments":[{"type":13,"value":"text"}]},{"type":5,"name":"class","value":"form-control","children":[{"type":3,"value":"form-control"}],"arguments":[{"type":13,"value":"form-control"}]},{"type":5,"name":"id","value":"inputImage","children":[{"type":3,"value":"inputImage"}],"arguments":[{"type":13,"value":"inputImage"}]},{"type":5,"name":"bind-to","value":"{{ craft.props.server.image }}","children":[{"type":7,"value":"craft.props.server.image"}],"arguments":[{"type":7,"value":"craft.props.server.image"}]}],"children":[]},{"type":3,"value":"\n\t\t\t"}]},{"type":3,"value":"\n\t\t"}]},{"type":3,"value":"\n\n\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"form-group","children":[{"type":3,"value":"form-group"}],"arguments":[{"type":13,"value":"form-group"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t"},{"name":"label","attributes":[{"type":5,"name":"class","value":"control-label col-lg-2","children":[{"type":3,"value":"control-label col-lg-2"}],"arguments":[{"type":13,"value":"control-label col-lg-2"}]},{"type":5,"name":"for","value":"selectVersion","children":[{"type":3,"value":"selectVersion"}],"arguments":[{"type":13,"value":"selectVersion"}]}],"type":4,"children":[{"type":3,"value":"Minecraft Version"}]},{"type":3,"value":"\n\t\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"col-lg-3","children":[{"type":3,"value":"col-lg-3"}],"arguments":[{"type":13,"value":"col-lg-3"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t"},{"name":"select","attributes":[{"type":5,"name":"bind-to","value":"{{ server.version }}","children":[{"type":7,"value":"server.version"}],"arguments":[{"type":7,"value":"server.version"}]},{"type":5,"name":"id","value":"selectVersion","children":[{"type":3,"value":"selectVersion"}],"arguments":[{"type":13,"value":"selectVersion"}]},{"type":5,"name":"class","value":"form-control","children":[{"type":3,"value":"form-control"}],"arguments":[{"type":13,"value":"form-control"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t\t"},{"type":9,"value":"mcversions","children":[{"type":3,"value":"\n\t\t\t\t\t"},{"name":"option","attributes":[{"type":5,"name":"value","value":"{{ this }}","children":[{"type":7,"value":"this"}],"arguments":[{"type":7,"value":"this"}]}],"type":4,"children":[{"type":7,"value":"this"}]},{"type":3,"value":"\n\t\t\t\t\t"}]},{"type":3,"value":"\n\t\t\t\t"}]},{"type":3,"value":"\n\t\t\t"}]},{"type":3,"value":"\n\t\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"col-lg-7","children":[{"type":3,"value":"col-lg-7"}],"arguments":[{"type":13,"value":"col-lg-7"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t"},{"name":"p","attributes":[{"type":5,"name":"class","value":"help-block","children":[{"type":3,"value":"help-block"}],"arguments":[{"type":13,"value":"help-block"}]}],"type":4,"children":[{"type":3,"value":"If changed, the server executable will be replaced on the next launch."}]},{"type":3,"value":"\n\t\t\t"}]},{"type":3,"value":"\n\t\t"}]},{"type":3,"value":"\n\t"}]},{"type":3,"value":"\n\n\t"},{"name":"fieldset","attributes":[],"type":4,"children":[{"type":3,"value":"\n\t\t"},{"name":"legend","attributes":[],"type":4,"children":[{"type":3,"value":"Server"}]},{"type":3,"value":"\n\n\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"form-group","children":[{"type":3,"value":"form-group"}],"arguments":[{"type":13,"value":"form-group"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t"},{"name":"label","attributes":[{"type":5,"name":"class","value":"control-label col-lg-2","children":[{"type":3,"value":"control-label col-lg-2"}],"arguments":[{"type":13,"value":"control-label col-lg-2"}]},{"type":5,"name":"for","value":"inputMOTD","children":[{"type":3,"value":"inputMOTD"}],"arguments":[{"type":13,"value":"inputMOTD"}]}],"type":4,"children":[{"type":3,"value":"Welcome Text"}]},{"type":3,"value":"\n\t\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"col-lg-8","children":[{"type":3,"value":"col-lg-8"}],"arguments":[{"type":13,"value":"col-lg-8"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t"},{"name":"input","type":4,"attributes":[{"type":5,"name":"type","value":"text","children":[{"type":3,"value":"text"}],"arguments":[{"type":13,"value":"text"}]},{"type":5,"name":"class","value":"form-control","children":[{"type":3,"value":"form-control"}],"arguments":[{"type":13,"value":"form-control"}]},{"type":5,"name":"id","value":"inputMOTD","children":[{"type":3,"value":"inputMOTD"}],"arguments":[{"type":13,"value":"inputMOTD"}]},{"type":5,"name":"maxlength","value":"59","children":[{"type":3,"value":"59"}],"arguments":[{"type":13,"value":59}]},{"type":5,"name":"bind-to","value":"{{ craft.props.game.motd }}","children":[{"type":7,"value":"craft.props.game.motd"}],"arguments":[{"type":7,"value":"craft.props.game.motd"}]}],"children":[]},{"type":3,"value":"\n\t\t\t"}]},{"type":3,"value":"\n\t\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"col-lg-2","children":[{"type":3,"value":"col-lg-2"}],"arguments":[{"type":13,"value":"col-lg-2"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t"},{"name":"p","attributes":[{"type":5,"name":"class","value":"help-block","children":[{"type":3,"value":"help-block"}],"arguments":[{"type":13,"value":"help-block"}]}],"type":4,"children":[{"type":7,"value":"motd_count"},{"type":3,"value":" / 59"}]},{"type":3,"value":"\n\t\t\t"}]},{"type":3,"value":"\n\t\t"}]},{"type":3,"value":"\n\n\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"form-group","children":[{"type":3,"value":"form-group"}],"arguments":[{"type":13,"value":"form-group"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t"},{"name":"label","attributes":[{"type":5,"name":"class","value":"control-label col-lg-2","children":[{"type":3,"value":"control-label col-lg-2"}],"arguments":[{"type":13,"value":"control-label col-lg-2"}]},{"type":5,"name":"for","value":"selectGameDifficulty","children":[{"type":3,"value":"selectGameDifficulty"}],"arguments":[{"type":13,"value":"selectGameDifficulty"}]}],"type":4,"children":[{"type":3,"value":"Difficulty"}]},{"type":3,"value":"\n\t\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"col-lg-3","children":[{"type":3,"value":"col-lg-3"}],"arguments":[{"type":13,"value":"col-lg-3"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t"},{"name":"select","attributes":[{"type":5,"name":"bind-to","value":"{{ craft.props.game.difficulty }}","children":[{"type":7,"value":"craft.props.game.difficulty"}],"arguments":[{"type":7,"value":"craft.props.game.difficulty"}]},{"type":5,"name":"id","value":"selectGameDifficulty","children":[{"type":3,"value":"selectGameDifficulty"}],"arguments":[{"type":13,"value":"selectGameDifficulty"}]},{"type":5,"name":"class","value":"form-control","children":[{"type":3,"value":"form-control"}],"arguments":[{"type":13,"value":"form-control"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t\t"},{"name":"option","attributes":[{"type":5,"name":"value","value":"0","children":[{"type":3,"value":"0"}],"arguments":[{"type":13,"value":0}]}],"type":4,"children":[{"type":3,"value":"Peaceful"}]},{"type":3,"value":"\n\t\t\t\t\t"},{"name":"option","attributes":[{"type":5,"name":"value","value":"1","children":[{"type":3,"value":"1"}],"arguments":[{"type":13,"value":1}]}],"type":4,"children":[{"type":3,"value":"Easy"}]},{"type":3,"value":"\n\t\t\t\t\t"},{"name":"option","attributes":[{"type":5,"name":"value","value":"2","children":[{"type":3,"value":"2"}],"arguments":[{"type":13,"value":2}]}],"type":4,"children":[{"type":3,"value":"Normal"}]},{"type":3,"value":"\n\t\t\t\t\t"},{"name":"option","attributes":[{"type":5,"name":"value","value":"3","children":[{"type":3,"value":"3"}],"arguments":[{"type":13,"value":3}]}],"type":4,"children":[{"type":3,"value":"Hard"}]},{"type":3,"value":"\n\t\t\t\t"}]},{"type":3,"value":"\n\t\t\t"}]},{"type":3,"value":"\n\t\t"}]},{"type":3,"value":"\n\n\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"form-group","children":[{"type":3,"value":"form-group"}],"arguments":[{"type":13,"value":"form-group"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t"},{"name":"label","attributes":[{"type":5,"name":"class","value":"control-label col-lg-2","children":[{"type":3,"value":"control-label col-lg-2"}],"arguments":[{"type":13,"value":"control-label col-lg-2"}]},{"type":5,"name":"for","value":"selectGameMode","children":[{"type":3,"value":"selectGameMode"}],"arguments":[{"type":13,"value":"selectGameMode"}]}],"type":4,"children":[{"type":3,"value":"Game Mode"}]},{"type":3,"value":"\n\t\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"col-lg-3","children":[{"type":3,"value":"col-lg-3"}],"arguments":[{"type":13,"value":"col-lg-3"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t"},{"name":"select","attributes":[{"type":5,"name":"bind-to","value":"{{ craft.props.game.gamemode }}","children":[{"type":7,"value":"craft.props.game.gamemode"}],"arguments":[{"type":7,"value":"craft.props.game.gamemode"}]},{"type":5,"name":"id","value":"selectGameMode","children":[{"type":3,"value":"selectGameMode"}],"arguments":[{"type":13,"value":"selectGameMode"}]},{"type":5,"name":"class","value":"form-control","children":[{"type":3,"value":"form-control"}],"arguments":[{"type":13,"value":"form-control"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t\t"},{"name":"option","attributes":[{"type":5,"name":"value","value":"0","children":[{"type":3,"value":"0"}],"arguments":[{"type":13,"value":0}]}],"type":4,"children":[{"type":3,"value":"Survival"}]},{"type":3,"value":"\n\t\t\t\t\t"},{"name":"option","attributes":[{"type":5,"name":"value","value":"1","children":[{"type":3,"value":"1"}],"arguments":[{"type":13,"value":1}]}],"type":4,"children":[{"type":3,"value":"Creative"}]},{"type":3,"value":"\n\t\t\t\t\t"},{"name":"option","attributes":[{"type":5,"name":"value","value":"2","children":[{"type":3,"value":"2"}],"arguments":[{"type":13,"value":2}]}],"type":4,"children":[{"type":3,"value":"Adventure"}]},{"type":3,"value":"\n\t\t\t\t\t"},{"name":"option","attributes":[{"type":5,"name":"value","value":"3","children":[{"type":3,"value":"3"}],"arguments":[{"type":13,"value":3}]}],"type":4,"children":[{"type":3,"value":"Spectator"}]},{"type":3,"value":"\n\t\t\t\t"}]},{"type":3,"value":"\n\t\t\t"}]},{"type":3,"value":"\n\t\t"}]},{"type":3,"value":"\n\n\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"form-group","children":[{"type":3,"value":"form-group"}],"arguments":[{"type":13,"value":"form-group"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t"},{"name":"label","attributes":[{"type":5,"name":"class","value":"control-label col-lg-2","children":[{"type":3,"value":"control-label col-lg-2"}],"arguments":[{"type":13,"value":"control-label col-lg-2"}]},{"type":5,"name":"for","value":"inputGameMaxPlayers","children":[{"type":3,"value":"inputGameMaxPlayers"}],"arguments":[{"type":13,"value":"inputGameMaxPlayers"}]}],"type":4,"children":[{"type":3,"value":"Max Players"}]},{"type":3,"value":"\n\t\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"col-lg-3","children":[{"type":3,"value":"col-lg-3"}],"arguments":[{"type":13,"value":"col-lg-3"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t"},{"name":"input","type":4,"attributes":[{"type":5,"name":"type","value":"number","children":[{"type":3,"value":"number"}],"arguments":[{"type":13,"value":"number"}]},{"type":5,"name":"class","value":"form-control","children":[{"type":3,"value":"form-control"}],"arguments":[{"type":13,"value":"form-control"}]},{"type":5,"name":"id","value":"inputGameMaxPlayers","children":[{"type":3,"value":"inputGameMaxPlayers"}],"arguments":[{"type":13,"value":"inputGameMaxPlayers"}]},{"type":5,"name":"bind-to","value":"{{ craft.props.game.max-players }}","children":[{"type":7,"value":"craft.props.game.max-players"}],"arguments":[{"type":7,"value":"craft.props.game.max-players"}]}],"children":[]},{"type":3,"value":"\n\t\t\t"}]},{"type":3,"value":"\n\t\t"}]},{"type":3,"value":"\n\n\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"form-group","children":[{"type":3,"value":"form-group"}],"arguments":[{"type":13,"value":"form-group"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t"},{"name":"label","attributes":[{"type":5,"name":"class","value":"control-label col-lg-2","children":[{"type":3,"value":"control-label col-lg-2"}],"arguments":[{"type":13,"value":"control-label col-lg-2"}]}],"type":4,"children":[{"type":3,"value":"Spawn"}]},{"type":3,"value":"\n\t\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"col-lg-10","children":[{"type":3,"value":"col-lg-10"}],"arguments":[{"type":13,"value":"col-lg-10"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"checkbox","children":[{"type":3,"value":"checkbox"}],"arguments":[{"type":13,"value":"checkbox"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t\t"},{"name":"label","attributes":[],"type":4,"children":[{"name":"input","type":4,"attributes":[{"type":5,"name":"bind-to","value":"{{ craft.props.game.generate-structures }}","children":[{"type":7,"value":"craft.props.game.generate-structures"}],"arguments":[{"type":7,"value":"craft.props.game.generate-structures"}]},{"type":5,"name":"type","value":"checkbox","children":[{"type":3,"value":"checkbox"}],"arguments":[{"type":13,"value":"checkbox"}]}],"children":[]},{"type":3,"value":" Structures"}]},{"type":3,"value":"\n\t\t\t\t\t"},{"name":"label","attributes":[],"type":4,"children":[{"name":"input","type":4,"attributes":[{"type":5,"name":"bind-to","value":"{{ craft.props.game.spawn-animals }}","children":[{"type":7,"value":"craft.props.game.spawn-animals"}],"arguments":[{"type":7,"value":"craft.props.game.spawn-animals"}]},{"type":5,"name":"type","value":"checkbox","children":[{"type":3,"value":"checkbox"}],"arguments":[{"type":13,"value":"checkbox"}]}],"children":[]},{"type":3,"value":" Animals"}]},{"type":3,"value":"\n\t\t\t\t\t"},{"name":"label","attributes":[],"type":4,"children":[{"name":"input","type":4,"attributes":[{"type":5,"name":"bind-to","value":"{{ craft.props.game.spawn-monsters }}","children":[{"type":7,"value":"craft.props.game.spawn-monsters"}],"arguments":[{"type":7,"value":"craft.props.game.spawn-monsters"}]},{"type":5,"name":"type","value":"checkbox","children":[{"type":3,"value":"checkbox"}],"arguments":[{"type":13,"value":"checkbox"}]}],"children":[]},{"type":3,"value":" Monsters"}]},{"type":3,"value":"\n\t\t\t\t\t"},{"name":"label","attributes":[],"type":4,"children":[{"name":"input","type":4,"attributes":[{"type":5,"name":"bind-to","value":"{{ craft.props.game.spawn-npcs }}","children":[{"type":7,"value":"craft.props.game.spawn-npcs"}],"arguments":[{"type":7,"value":"craft.props.game.spawn-npcs"}]},{"type":5,"name":"type","value":"checkbox","children":[{"type":3,"value":"checkbox"}],"arguments":[{"type":13,"value":"checkbox"}]}],"children":[]},{"type":3,"value":" NPCs"}]},{"type":3,"value":"\n\t\t\t\t"}]},{"type":3,"value":"\n\t\t\t"}]},{"type":3,"value":"\n\t\t"}]},{"type":3,"value":"\n\n\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"form-group","children":[{"type":3,"value":"form-group"}],"arguments":[{"type":13,"value":"form-group"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t"},{"name":"label","attributes":[{"type":5,"name":"class","value":"control-label col-lg-2","children":[{"type":3,"value":"control-label col-lg-2"}],"arguments":[{"type":13,"value":"control-label col-lg-2"}]}],"type":4,"children":[{"type":3,"value":"Misc"}]},{"type":3,"value":"\n\t\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"col-lg-10","children":[{"type":3,"value":"col-lg-10"}],"arguments":[{"type":13,"value":"col-lg-10"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"checkbox","children":[{"type":3,"value":"checkbox"}],"arguments":[{"type":13,"value":"checkbox"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t\t"},{"name":"label","attributes":[],"type":4,"children":[{"name":"input","type":4,"attributes":[{"type":5,"name":"bind-to","value":"{{ craft.props.game.allow-flight }}","children":[{"type":7,"value":"craft.props.game.allow-flight"}],"arguments":[{"type":7,"value":"craft.props.game.allow-flight"}]},{"type":5,"name":"type","value":"checkbox","children":[{"type":3,"value":"checkbox"}],"arguments":[{"type":13,"value":"checkbox"}]}],"children":[]},{"type":3,"value":" Enable Flight"}]},{"type":3,"value":"\n\t\t\t\t\t"},{"name":"label","attributes":[],"type":4,"children":[{"name":"input","type":4,"attributes":[{"type":5,"name":"bind-to","value":"{{ craft.props.game.allow-nether }}","children":[{"type":7,"value":"craft.props.game.allow-nether"}],"arguments":[{"type":7,"value":"craft.props.game.allow-nether"}]},{"type":5,"name":"type","value":"checkbox","children":[{"type":3,"value":"checkbox"}],"arguments":[{"type":13,"value":"checkbox"}]}],"children":[]},{"type":3,"value":" Allow Nether Portals"}]},{"type":3,"value":"\n\t\t\t\t\t"},{"name":"label","attributes":[],"type":4,"children":[{"name":"input","type":4,"attributes":[{"type":5,"name":"bind-to","value":"{{ craft.props.game.pvp }}","children":[{"type":7,"value":"craft.props.game.pvp"}],"arguments":[{"type":7,"value":"craft.props.game.pvp"}]},{"type":5,"name":"type","value":"checkbox","children":[{"type":3,"value":"checkbox"}],"arguments":[{"type":13,"value":"checkbox"}]}],"children":[]},{"type":3,"value":" PVP"}]},{"type":3,"value":"\n\t\t\t\t"}]},{"type":3,"value":"\n\t\t\t"}]},{"type":3,"value":"\n\t\t"}]},{"type":3,"value":"\n\t"}]},{"type":3,"value":"\n\n\t"},{"name":"fieldset","attributes":[],"type":4,"children":[{"type":3,"value":"\n\t\t"},{"name":"hr","type":4,"attributes":[],"children":[]},{"type":3,"value":"\n\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"form-group","children":[{"type":3,"value":"form-group"}],"arguments":[{"type":13,"value":"form-group"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t"},{"name":"div","attributes":[{"type":5,"name":"class","value":"col-lg-10 col-lg-offset-2","children":[{"type":3,"value":"col-lg-10 col-lg-offset-2"}],"arguments":[{"type":13,"value":"col-lg-10 col-lg-offset-2"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t"},{"name":"button","attributes":[{"type":5,"name":"type","value":"submit","children":[{"type":3,"value":"submit"}],"arguments":[{"type":13,"value":"submit"}]},{"type":5,"name":"on-click","value":"save","children":[{"type":3,"value":"save"}],"arguments":[{"type":13,"value":"save"}]},{"type":5,"name":"class","value":"btn btn-success","children":[{"type":3,"value":"btn btn-success"}],"arguments":[{"type":13,"value":"btn btn-success"}]},{"type":5,"name":"disabled","value":"{{ saving }}","children":[{"type":7,"value":"saving"}],"arguments":[{"type":7,"value":"saving"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t\t"},{"type":9,"value":"saving","children":[{"name":"i","attributes":[{"type":5,"name":"class","value":"icon icon-cog icon-spin","children":[{"type":3,"value":"icon icon-cog icon-spin"}],"arguments":[{"type":13,"value":"icon icon-cog icon-spin"}]}],"type":4,"children":[]},{"type":3,"value":" Saving..."}]},{"type":3,"value":"\n\t\t\t\t\t"},{"type":10,"value":"saving","children":[{"type":3,"value":"Save"}]},{"type":3,"value":"\n\t\t\t\t"}]},{"type":3,"value":"\n\t\t\t\t"},{"type":9,"value":"state:running","children":[{"type":3,"value":"\n\t\t\t\t"},{"name":"button","attributes":[{"type":5,"name":"on-click","value":"save-restart","children":[{"type":3,"value":"save-restart"}],"arguments":[{"type":13,"value":"save-restart"}]},{"type":5,"name":"class","value":"btn btn-primary","children":[{"type":3,"value":"btn btn-primary"}],"arguments":[{"type":13,"value":"btn btn-primary"}]},{"type":5,"name":"disabled","value":"{{ saving }}","children":[{"type":7,"value":"saving"}],"arguments":[{"type":7,"value":"saving"}]}],"type":4,"children":[{"type":3,"value":"Save &amp; Restart"}]},{"type":3,"value":"\n\t\t\t\t"}]},{"type":3,"value":"\n\t\t\t\t"},{"name":"span","attributes":[{"type":5,"name":"class","value":"help-inline","children":[{"type":3,"value":"help-inline"}],"arguments":[{"type":13,"value":"help-inline"}]}],"type":4,"children":[{"type":3,"value":"\n\t\t\t\t\t"},{"type":9,"value":"success","children":[{"name":"span","attributes":[{"type":5,"name":"class","value":"text-success","children":[{"type":3,"value":"text-success"}],"arguments":[{"type":13,"value":"text-success"}]}],"type":4,"children":[{"type":3,"value":"Settings saved successfully."}]}]},{"type":3,"value":"\n\t\t\t\t\t"},{"type":9,"value":"error","children":[{"name":"span","attributes":[{"type":5,"name":"class","value":"text-danger","children":[{"type":3,"value":"text-danger"}],"arguments":[{"type":13,"value":"text-danger"}]}],"type":4,"children":[{"type":7,"value":"this"}]}]},{"type":3,"value":"\n\t\t\t\t\t"},{"type":9,"value":"normal","children":[{"type":3,"value":"Server must be restarted for changes to take effect."}]},{"type":3,"value":"\n\t\t\t\t"}]},{"type":3,"value":"\n\t\t\t"}]},{"type":3,"value":"\n\t\t"}]},{"type":3,"value":"\n\t"}]},{"type":3,"value":"\n"}]}],"version":"1.1.0"};
+},{}],13:[function(require,module,exports){
 var _ = require("underscore");
 
 module.exports = View.extend({
@@ -2651,7 +2738,7 @@ module.exports = View.extend({
 		}
 	}
 });
-},{"../templates/console.html":8,"underscore":131}],13:[function(require,module,exports){
+},{"../templates/console.html":9,"underscore":132}],14:[function(require,module,exports){
 
 
 module.exports = View.extend({
@@ -2687,7 +2774,7 @@ module.exports = View.extend({
 		datafeed: require("./console")
 	}
 });
-},{"../templates/panel-layout.html":9,"./console":12,"./server-info":14,"./settings":15}],14:[function(require,module,exports){
+},{"../templates/panel-layout.html":10,"./console":13,"./server-info":15,"./settings":16}],15:[function(require,module,exports){
 var _ = require("underscore");
 
 module.exports = View.extend({
@@ -2724,7 +2811,7 @@ module.exports = View.extend({
 		}
 	}
 });
-},{"../templates/server-info.html":10,"underscore":131}],15:[function(require,module,exports){
+},{"../templates/server-info.html":11,"underscore":132}],16:[function(require,module,exports){
 var _ = require("underscore");
 
 module.exports = View.extend({
@@ -2778,7 +2865,7 @@ module.exports = View.extend({
 		});
 	}
 });
-},{"../templates/settings.html":11,"underscore":131}],16:[function(require,module,exports){
+},{"../templates/settings.html":12,"underscore":132}],17:[function(require,module,exports){
 //     Backbone.js 1.1.2
 
 //     (c) 2010-2014 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
@@ -4388,7 +4475,7 @@ module.exports = View.extend({
 
 }));
 
-},{"underscore":131}],17:[function(require,module,exports){
+},{"underscore":132}],18:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Petka Antonov
  * 
@@ -4436,7 +4523,7 @@ Promise.prototype.any = function Promise$any() {
 
 };
 
-},{}],18:[function(require,module,exports){
+},{}],19:[function(require,module,exports){
 (function (process){
 /**
  * Copyright (c) 2014 Petka Antonov
@@ -4551,7 +4638,7 @@ Async.prototype._reset = function Async$_reset() {
 module.exports = new Async();
 
 }).call(this,require('_process'))
-},{"./queue.js":41,"./schedule.js":44,"./util.js":51,"_process":53}],19:[function(require,module,exports){
+},{"./queue.js":42,"./schedule.js":45,"./util.js":52,"_process":54}],20:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Petka Antonov
  * 
@@ -4577,7 +4664,7 @@ module.exports = new Async();
 "use strict";
 var Promise = require("./promise.js")();
 module.exports = Promise;
-},{"./promise.js":36}],20:[function(require,module,exports){
+},{"./promise.js":37}],21:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Petka Antonov
  * 
@@ -4698,7 +4785,7 @@ Promise.prototype.get = function Promise$get(propertyName) {
 };
 };
 
-},{"./util.js":51}],21:[function(require,module,exports){
+},{"./util.js":52}],22:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Petka Antonov
  * 
@@ -4775,7 +4862,7 @@ function Promise$fork(didFulfill, didReject, didProgress) {
 };
 };
 
-},{"./async.js":18,"./errors.js":26}],22:[function(require,module,exports){
+},{"./async.js":19,"./errors.js":27}],23:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Petka Antonov
  * 
@@ -5010,7 +5097,7 @@ var captureStackTrace = (function stackDetection() {
 return CapturedTrace;
 };
 
-},{"./es5.js":28,"./util.js":51}],23:[function(require,module,exports){
+},{"./es5.js":29,"./util.js":52}],24:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Petka Antonov
  * 
@@ -5106,7 +5193,7 @@ CatchFilter.prototype.doFilter = function CatchFilter$_doFilter(e) {
 return CatchFilter;
 };
 
-},{"./errors.js":26,"./es5.js":28,"./util.js":51}],24:[function(require,module,exports){
+},{"./errors.js":27,"./es5.js":29,"./util.js":52}],25:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Petka Antonov
  * 
@@ -5186,7 +5273,7 @@ function Promise$thenThrow(reason) {
 };
 };
 
-},{"./util.js":51}],25:[function(require,module,exports){
+},{"./util.js":52}],26:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Petka Antonov
  * 
@@ -5222,7 +5309,7 @@ Promise.each = function Promise$Each(promises, fn) {
 };
 };
 
-},{}],26:[function(require,module,exports){
+},{}],27:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Petka Antonov
  * 
@@ -5369,7 +5456,7 @@ module.exports = {
     canAttach: canAttach
 };
 
-},{"./es5.js":28,"./util.js":51}],27:[function(require,module,exports){
+},{"./es5.js":29,"./util.js":52}],28:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Petka Antonov
  * 
@@ -5409,7 +5496,7 @@ function apiRejection(msg) {
 return apiRejection;
 };
 
-},{"./errors.js":26}],28:[function(require,module,exports){
+},{"./errors.js":27}],29:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Petka Antonov
  * 
@@ -5498,7 +5585,7 @@ if (isES5) {
     };
 }
 
-},{}],29:[function(require,module,exports){
+},{}],30:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Petka Antonov
  * 
@@ -5534,7 +5621,7 @@ Promise.filter = function Promise$Filter(promises, fn, options) {
 };
 };
 
-},{}],30:[function(require,module,exports){
+},{}],31:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Petka Antonov
  * 
@@ -5656,7 +5743,7 @@ Promise.prototype.tap = function Promise$tap(handler) {
 };
 };
 
-},{"./util.js":51}],31:[function(require,module,exports){
+},{"./util.js":52}],32:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Petka Antonov
  * 
@@ -5809,7 +5896,7 @@ Promise.spawn = function Promise$Spawn(generatorFunction) {
 };
 };
 
-},{"./errors.js":26,"./util.js":51}],32:[function(require,module,exports){
+},{"./errors.js":27,"./util.js":52}],33:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Petka Antonov
  * 
@@ -5933,7 +6020,7 @@ Promise.join = function Promise$Join() {
 
 };
 
-},{"./util.js":51}],33:[function(require,module,exports){
+},{"./util.js":52}],34:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Petka Antonov
  * 
@@ -6084,7 +6171,7 @@ Promise.map = function Promise$Map(promises, fn, options, _filter) {
 
 };
 
-},{"./util.js":51}],34:[function(require,module,exports){
+},{"./util.js":52}],35:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Petka Antonov
  * 
@@ -6162,7 +6249,7 @@ Promise.prototype.nodeify = function Promise$nodeify(nodeback, options) {
 };
 };
 
-},{"./async.js":18,"./util.js":51}],35:[function(require,module,exports){
+},{"./async.js":19,"./util.js":52}],36:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Petka Antonov
  * 
@@ -6276,7 +6363,7 @@ function Promise$_progressUnchecked(progressValue) {
 };
 };
 
-},{"./async.js":18,"./errors.js":26,"./util.js":51}],36:[function(require,module,exports){
+},{"./async.js":19,"./errors.js":27,"./util.js":52}],37:[function(require,module,exports){
 (function (process){
 /**
  * Copyright (c) 2014 Petka Antonov
@@ -7357,7 +7444,7 @@ return Promise;
 };
 
 }).call(this,require('_process'))
-},{"./any.js":17,"./async.js":18,"./call_get.js":20,"./cancel.js":21,"./captured_trace.js":22,"./catch_filter.js":23,"./direct_resolve.js":24,"./each.js":25,"./errors.js":26,"./errors_api_rejection":27,"./filter.js":29,"./finally.js":30,"./generators.js":31,"./join.js":32,"./map.js":33,"./nodeify.js":34,"./progress.js":35,"./promise_array.js":37,"./promise_resolver.js":38,"./promisify.js":39,"./props.js":40,"./race.js":42,"./reduce.js":43,"./settle.js":45,"./some.js":46,"./synchronous_inspection.js":47,"./thenables.js":48,"./timers.js":49,"./using.js":50,"./util.js":51,"_process":53}],37:[function(require,module,exports){
+},{"./any.js":18,"./async.js":19,"./call_get.js":21,"./cancel.js":22,"./captured_trace.js":23,"./catch_filter.js":24,"./direct_resolve.js":25,"./each.js":26,"./errors.js":27,"./errors_api_rejection":28,"./filter.js":30,"./finally.js":31,"./generators.js":32,"./join.js":33,"./map.js":34,"./nodeify.js":35,"./progress.js":36,"./promise_array.js":38,"./promise_resolver.js":39,"./promisify.js":40,"./props.js":41,"./race.js":43,"./reduce.js":44,"./settle.js":46,"./some.js":47,"./synchronous_inspection.js":48,"./thenables.js":49,"./timers.js":50,"./using.js":51,"./util.js":52,"_process":54}],38:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Petka Antonov
  * 
@@ -7561,7 +7648,7 @@ function PromiseArray$getActualLength(len) {
 return PromiseArray;
 };
 
-},{"./errors.js":26,"./util.js":51}],38:[function(require,module,exports){
+},{"./errors.js":27,"./util.js":52}],39:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Petka Antonov
  * 
@@ -7721,7 +7808,7 @@ function PromiseResolver$_setCarriedStackTrace(trace) {
 
 module.exports = PromiseResolver;
 
-},{"./async.js":18,"./errors.js":26,"./es5.js":28,"./util.js":51}],39:[function(require,module,exports){
+},{"./async.js":19,"./errors.js":27,"./es5.js":29,"./util.js":52}],40:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Petka Antonov
  * 
@@ -8049,7 +8136,7 @@ Promise.promisifyAll = function Promise$PromisifyAll(target, options) {
 };
 
 
-},{"./errors":26,"./promise_resolver.js":38,"./util.js":51}],40:[function(require,module,exports){
+},{"./errors":27,"./promise_resolver.js":39,"./util.js":52}],41:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Petka Antonov
  * 
@@ -8159,7 +8246,7 @@ Promise.props = function Promise$Props(promises) {
 };
 };
 
-},{"./errors_api_rejection":27,"./es5.js":28,"./util.js":51}],41:[function(require,module,exports){
+},{"./errors_api_rejection":28,"./es5.js":29,"./util.js":52}],42:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Petka Antonov
  * 
@@ -8276,7 +8363,7 @@ Queue.prototype._resizeTo = function Queue$_resizeTo(capacity) {
 
 module.exports = Queue;
 
-},{}],42:[function(require,module,exports){
+},{}],43:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Petka Antonov
  * 
@@ -8350,7 +8437,7 @@ Promise.prototype.race = function Promise$race() {
 
 };
 
-},{"./errors_api_rejection.js":27,"./util.js":51}],43:[function(require,module,exports){
+},{"./errors_api_rejection.js":28,"./util.js":52}],44:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Petka Antonov
  * 
@@ -8533,7 +8620,7 @@ Promise.reduce = function Promise$Reduce(promises, fn, initialValue, _each) {
 };
 };
 
-},{"./util.js":51}],44:[function(require,module,exports){
+},{"./util.js":52}],45:[function(require,module,exports){
 (function (process){
 /**
  * Copyright (c) 2014 Petka Antonov
@@ -8598,7 +8685,7 @@ else throw new Error("no async scheduler available");
 module.exports = schedule;
 
 }).call(this,require('_process'))
-},{"_process":53}],45:[function(require,module,exports){
+},{"_process":54}],46:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Petka Antonov
  * 
@@ -8667,7 +8754,7 @@ Promise.prototype.settle = function Promise$settle() {
 };
 };
 
-},{"./util.js":51}],46:[function(require,module,exports){
+},{"./util.js":52}],47:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Petka Antonov
  * 
@@ -8830,7 +8917,7 @@ Promise.prototype.some = function Promise$some(howMany) {
 Promise._SomePromiseArray = SomePromiseArray;
 };
 
-},{"./errors.js":26,"./util.js":51}],47:[function(require,module,exports){
+},{"./errors.js":27,"./util.js":52}],48:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Petka Antonov
  * 
@@ -8908,7 +8995,7 @@ Promise.prototype.isResolved = function Promise$isResolved() {
 Promise.PromiseInspection = PromiseInspection;
 };
 
-},{}],48:[function(require,module,exports){
+},{}],49:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Petka Antonov
  * 
@@ -9043,7 +9130,7 @@ function Promise$_doThenable(x, then, originalPromise) {
 return Promise$_Cast;
 };
 
-},{"./errors.js":26,"./util.js":51}],49:[function(require,module,exports){
+},{"./errors.js":27,"./util.js":52}],50:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Petka Antonov
  * 
@@ -9136,7 +9223,7 @@ Promise.prototype.timeout = function Promise$timeout(ms, message) {
 
 };
 
-},{"./errors.js":26,"./errors_api_rejection":27,"./util.js":51}],50:[function(require,module,exports){
+},{"./errors.js":27,"./errors_api_rejection":28,"./util.js":52}],51:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Petka Antonov
  * 
@@ -9328,7 +9415,7 @@ module.exports = function (Promise, apiRejection, cast) {
 
 };
 
-},{"./errors.js":26,"./util.js":51}],51:[function(require,module,exports){
+},{"./errors.js":27,"./util.js":52}],52:[function(require,module,exports){
 /**
  * Copyright (c) 2014 Petka Antonov
  * 
@@ -9598,7 +9685,7 @@ var ret = {
 
 module.exports = ret;
 
-},{"./es5.js":28}],52:[function(require,module,exports){
+},{"./es5.js":29}],53:[function(require,module,exports){
 (function (process){
 // Copyright Joyent, Inc. and other Node contributors.
 //
@@ -9826,7 +9913,7 @@ var substr = 'ab'.substr(-1) === 'b'
 ;
 
 }).call(this,require('_process'))
-},{"_process":53}],53:[function(require,module,exports){
+},{"_process":54}],54:[function(require,module,exports){
 // shim for using process in browser
 
 var process = module.exports = {};
@@ -9891,7 +9978,7 @@ process.chdir = function (dir) {
     throw new Error('process.chdir is not supported');
 };
 
-},{}],54:[function(require,module,exports){
+},{}],55:[function(require,module,exports){
 (function (global){
 /*! http://mths.be/punycode v1.2.4 by @mathias */
 ;(function(root) {
@@ -10402,7 +10489,7 @@ process.chdir = function (dir) {
 }(this));
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],55:[function(require,module,exports){
+},{}],56:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -10488,7 +10575,7 @@ var isArray = Array.isArray || function (xs) {
   return Object.prototype.toString.call(xs) === '[object Array]';
 };
 
-},{}],56:[function(require,module,exports){
+},{}],57:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -10575,13 +10662,13 @@ var objectKeys = Object.keys || function (obj) {
   return res;
 };
 
-},{}],57:[function(require,module,exports){
+},{}],58:[function(require,module,exports){
 'use strict';
 
 exports.decode = exports.parse = require('./decode');
 exports.encode = exports.stringify = require('./encode');
 
-},{"./decode":55,"./encode":56}],58:[function(require,module,exports){
+},{"./decode":56,"./encode":57}],59:[function(require,module,exports){
 // Copyright Joyent, Inc. and other Node contributors.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a
@@ -11290,7 +11377,7 @@ function isNullOrUndefined(arg) {
   return  arg == null;
 }
 
-},{"punycode":54,"querystring":57}],59:[function(require,module,exports){
+},{"punycode":55,"querystring":58}],60:[function(require,module,exports){
 /*!
  * jQuery JavaScript Library v2.1.1
  * http://jquery.com/
@@ -20482,7 +20569,7 @@ return jQuery;
 
 }));
 
-},{}],60:[function(require,module,exports){
+},{}],61:[function(require,module,exports){
 (function (global){
 //! moment.js
 //! version : 2.8.3
@@ -23342,11 +23429,11 @@ return jQuery;
 }).call(this);
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],61:[function(require,module,exports){
+},{}],62:[function(require,module,exports){
 
 module.exports = require('./lib/');
 
-},{"./lib/":62}],62:[function(require,module,exports){
+},{"./lib/":63}],63:[function(require,module,exports){
 
 /**
  * Module dependencies.
@@ -23435,7 +23522,7 @@ exports.connect = lookup;
 exports.Manager = require('./manager');
 exports.Socket = require('./socket');
 
-},{"./manager":63,"./socket":65,"./url":66,"debug":69,"socket.io-parser":100}],63:[function(require,module,exports){
+},{"./manager":64,"./socket":66,"./url":67,"debug":70,"socket.io-parser":101}],64:[function(require,module,exports){
 
 /**
  * Module dependencies.
@@ -23895,7 +23982,7 @@ Manager.prototype.onreconnect = function(){
   this.emitAll('reconnect', attempt);
 };
 
-},{"./on":64,"./socket":65,"./url":66,"component-bind":67,"component-emitter":68,"debug":69,"engine.io-client":70,"object-component":97,"socket.io-parser":100}],64:[function(require,module,exports){
+},{"./on":65,"./socket":66,"./url":67,"component-bind":68,"component-emitter":69,"debug":70,"engine.io-client":71,"object-component":98,"socket.io-parser":101}],65:[function(require,module,exports){
 
 /**
  * Module exports.
@@ -23921,7 +24008,7 @@ function on(obj, ev, fn) {
   };
 }
 
-},{}],65:[function(require,module,exports){
+},{}],66:[function(require,module,exports){
 
 /**
  * Module dependencies.
@@ -24301,7 +24388,7 @@ Socket.prototype.disconnect = function(){
   return this;
 };
 
-},{"./on":64,"component-bind":67,"component-emitter":68,"debug":69,"has-binary":94,"indexof":96,"socket.io-parser":100,"to-array":104}],66:[function(require,module,exports){
+},{"./on":65,"component-bind":68,"component-emitter":69,"debug":70,"has-binary":95,"indexof":97,"socket.io-parser":101,"to-array":105}],67:[function(require,module,exports){
 (function (global){
 
 /**
@@ -24376,7 +24463,7 @@ function url(uri, loc){
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"debug":69,"parseuri":98}],67:[function(require,module,exports){
+},{"debug":70,"parseuri":99}],68:[function(require,module,exports){
 /**
  * Slice reference.
  */
@@ -24401,7 +24488,7 @@ module.exports = function(obj, fn){
   }
 };
 
-},{}],68:[function(require,module,exports){
+},{}],69:[function(require,module,exports){
 
 /**
  * Expose `Emitter`.
@@ -24567,7 +24654,7 @@ Emitter.prototype.hasListeners = function(event){
   return !! this.listeners(event).length;
 };
 
-},{}],69:[function(require,module,exports){
+},{}],70:[function(require,module,exports){
 
 /**
  * Expose `debug()` as the module.
@@ -24706,11 +24793,11 @@ try {
   if (window.localStorage) debug.enable(localStorage.debug);
 } catch(e){}
 
-},{}],70:[function(require,module,exports){
+},{}],71:[function(require,module,exports){
 
 module.exports =  require('./lib/');
 
-},{"./lib/":71}],71:[function(require,module,exports){
+},{"./lib/":72}],72:[function(require,module,exports){
 
 module.exports = require('./socket');
 
@@ -24722,7 +24809,7 @@ module.exports = require('./socket');
  */
 module.exports.parser = require('engine.io-parser');
 
-},{"./socket":72,"engine.io-parser":81}],72:[function(require,module,exports){
+},{"./socket":73,"engine.io-parser":82}],73:[function(require,module,exports){
 (function (global){
 /**
  * Module dependencies.
@@ -25374,7 +25461,7 @@ Socket.prototype.filterUpgrades = function (upgrades) {
 };
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./transport":73,"./transports":74,"component-emitter":68,"debug":69,"engine.io-parser":81,"indexof":96,"parsejson":90,"parseqs":91,"parseuri":92}],73:[function(require,module,exports){
+},{"./transport":74,"./transports":75,"component-emitter":69,"debug":70,"engine.io-parser":82,"indexof":97,"parsejson":91,"parseqs":92,"parseuri":93}],74:[function(require,module,exports){
 /**
  * Module dependencies.
  */
@@ -25526,7 +25613,7 @@ Transport.prototype.onClose = function () {
   this.emit('close');
 };
 
-},{"component-emitter":68,"engine.io-parser":81}],74:[function(require,module,exports){
+},{"component-emitter":69,"engine.io-parser":82}],75:[function(require,module,exports){
 (function (global){
 /**
  * Module dependencies
@@ -25583,7 +25670,7 @@ function polling(opts){
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./polling-jsonp":75,"./polling-xhr":76,"./websocket":78,"xmlhttprequest":79}],75:[function(require,module,exports){
+},{"./polling-jsonp":76,"./polling-xhr":77,"./websocket":79,"xmlhttprequest":80}],76:[function(require,module,exports){
 (function (global){
 
 /**
@@ -25819,7 +25906,7 @@ JSONPPolling.prototype.doWrite = function (data, fn) {
 };
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./polling":77,"component-inherit":80}],76:[function(require,module,exports){
+},{"./polling":78,"component-inherit":81}],77:[function(require,module,exports){
 (function (global){
 /**
  * Module requirements.
@@ -26174,7 +26261,7 @@ function unloadHandler() {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./polling":77,"component-emitter":68,"component-inherit":80,"debug":69,"xmlhttprequest":79}],77:[function(require,module,exports){
+},{"./polling":78,"component-emitter":69,"component-inherit":81,"debug":70,"xmlhttprequest":80}],78:[function(require,module,exports){
 /**
  * Module dependencies.
  */
@@ -26421,7 +26508,7 @@ Polling.prototype.uri = function(){
   return schema + '://' + this.hostname + port + this.path + query;
 };
 
-},{"../transport":73,"component-inherit":80,"debug":69,"engine.io-parser":81,"parseqs":91,"xmlhttprequest":79}],78:[function(require,module,exports){
+},{"../transport":74,"component-inherit":81,"debug":70,"engine.io-parser":82,"parseqs":92,"xmlhttprequest":80}],79:[function(require,module,exports){
 /**
  * Module dependencies.
  */
@@ -26652,7 +26739,7 @@ WS.prototype.check = function(){
   return !!WebSocket && !('__initialize' in WebSocket && this.name === WS.prototype.name);
 };
 
-},{"../transport":73,"component-inherit":80,"debug":69,"engine.io-parser":81,"parseqs":91,"ws":93}],79:[function(require,module,exports){
+},{"../transport":74,"component-inherit":81,"debug":70,"engine.io-parser":82,"parseqs":92,"ws":94}],80:[function(require,module,exports){
 // browser shim for xmlhttprequest module
 var hasCORS = require('has-cors');
 
@@ -26690,7 +26777,7 @@ module.exports = function(opts) {
   }
 }
 
-},{"has-cors":88}],80:[function(require,module,exports){
+},{"has-cors":89}],81:[function(require,module,exports){
 
 module.exports = function(a, b){
   var fn = function(){};
@@ -26698,7 +26785,7 @@ module.exports = function(a, b){
   a.prototype = new fn;
   a.prototype.constructor = a;
 };
-},{}],81:[function(require,module,exports){
+},{}],82:[function(require,module,exports){
 (function (global){
 /**
  * Module dependencies.
@@ -27268,7 +27355,7 @@ exports.decodePayloadAsBinary = function (data, binaryType, callback) {
 };
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./keys":82,"after":83,"arraybuffer.slice":84,"base64-arraybuffer":85,"blob":86,"utf8":87}],82:[function(require,module,exports){
+},{"./keys":83,"after":84,"arraybuffer.slice":85,"base64-arraybuffer":86,"blob":87,"utf8":88}],83:[function(require,module,exports){
 
 /**
  * Gets the keys for an object.
@@ -27289,7 +27376,7 @@ module.exports = Object.keys || function keys (obj){
   return arr;
 };
 
-},{}],83:[function(require,module,exports){
+},{}],84:[function(require,module,exports){
 module.exports = after
 
 function after(count, callback, err_cb) {
@@ -27319,7 +27406,7 @@ function after(count, callback, err_cb) {
 
 function noop() {}
 
-},{}],84:[function(require,module,exports){
+},{}],85:[function(require,module,exports){
 /**
  * An abstraction for slicing an arraybuffer even when
  * ArrayBuffer.prototype.slice is not supported
@@ -27350,7 +27437,7 @@ module.exports = function(arraybuffer, start, end) {
   return result.buffer;
 };
 
-},{}],85:[function(require,module,exports){
+},{}],86:[function(require,module,exports){
 /*
  * base64-arraybuffer
  * https://github.com/niklasvh/base64-arraybuffer
@@ -27411,7 +27498,7 @@ module.exports = function(arraybuffer, start, end) {
   };
 })("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/");
 
-},{}],86:[function(require,module,exports){
+},{}],87:[function(require,module,exports){
 (function (global){
 /**
  * Create a blob builder even when vendor prefixes exist
@@ -27464,7 +27551,7 @@ module.exports = (function() {
 })();
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],87:[function(require,module,exports){
+},{}],88:[function(require,module,exports){
 (function (global){
 /*! http://mths.be/utf8js v2.0.0 by @mathias */
 ;(function(root) {
@@ -27707,7 +27794,7 @@ module.exports = (function() {
 }(this));
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],88:[function(require,module,exports){
+},{}],89:[function(require,module,exports){
 
 /**
  * Module dependencies.
@@ -27732,7 +27819,7 @@ try {
   module.exports = false;
 }
 
-},{"global":89}],89:[function(require,module,exports){
+},{"global":90}],90:[function(require,module,exports){
 
 /**
  * Returns `this`. Execute this without a "context" (i.e. without it being
@@ -27742,7 +27829,7 @@ try {
 
 module.exports = (function () { return this; })();
 
-},{}],90:[function(require,module,exports){
+},{}],91:[function(require,module,exports){
 (function (global){
 /**
  * JSON parse.
@@ -27777,7 +27864,7 @@ module.exports = function parsejson(data) {
   }
 };
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],91:[function(require,module,exports){
+},{}],92:[function(require,module,exports){
 /**
  * Compiles a querystring
  * Returns string representation of the object
@@ -27816,7 +27903,7 @@ exports.decode = function(qs){
   return qry;
 };
 
-},{}],92:[function(require,module,exports){
+},{}],93:[function(require,module,exports){
 /**
  * Parses an URI
  *
@@ -27857,7 +27944,7 @@ module.exports = function parseuri(str) {
     return uri;
 };
 
-},{}],93:[function(require,module,exports){
+},{}],94:[function(require,module,exports){
 
 /**
  * Module dependencies.
@@ -27902,7 +27989,7 @@ function ws(uri, protocols, opts) {
 
 if (WebSocket) ws.prototype = WebSocket.prototype;
 
-},{}],94:[function(require,module,exports){
+},{}],95:[function(require,module,exports){
 (function (global){
 
 /*
@@ -27964,12 +28051,12 @@ function hasBinary(data) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"isarray":95}],95:[function(require,module,exports){
+},{"isarray":96}],96:[function(require,module,exports){
 module.exports = Array.isArray || function (arr) {
   return Object.prototype.toString.call(arr) == '[object Array]';
 };
 
-},{}],96:[function(require,module,exports){
+},{}],97:[function(require,module,exports){
 
 var indexOf = [].indexOf;
 
@@ -27980,7 +28067,7 @@ module.exports = function(arr, obj){
   }
   return -1;
 };
-},{}],97:[function(require,module,exports){
+},{}],98:[function(require,module,exports){
 
 /**
  * HOP ref.
@@ -28065,7 +28152,7 @@ exports.length = function(obj){
 exports.isEmpty = function(obj){
   return 0 == exports.length(obj);
 };
-},{}],98:[function(require,module,exports){
+},{}],99:[function(require,module,exports){
 /**
  * Parses an URI
  *
@@ -28092,7 +28179,7 @@ module.exports = function parseuri(str) {
   return uri;
 };
 
-},{}],99:[function(require,module,exports){
+},{}],100:[function(require,module,exports){
 (function (global){
 /*global Blob,File*/
 
@@ -28237,7 +28324,7 @@ exports.removeBlobs = function(data, callback) {
 };
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"./is-buffer":101,"isarray":102}],100:[function(require,module,exports){
+},{"./is-buffer":102,"isarray":103}],101:[function(require,module,exports){
 
 /**
  * Module dependencies.
@@ -28635,7 +28722,7 @@ function error(data){
   };
 }
 
-},{"./binary":99,"./is-buffer":101,"component-emitter":68,"debug":69,"isarray":102,"json3":103}],101:[function(require,module,exports){
+},{"./binary":100,"./is-buffer":102,"component-emitter":69,"debug":70,"isarray":103,"json3":104}],102:[function(require,module,exports){
 (function (global){
 
 module.exports = isBuf;
@@ -28652,9 +28739,9 @@ function isBuf(obj) {
 }
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],102:[function(require,module,exports){
-module.exports=require(95)
-},{"/Users/Tyler/Dropbox/Clients/TJCrap/Dev/craft/mc-manager/node_modules/socket.io-client/node_modules/has-binary/node_modules/isarray/index.js":95}],103:[function(require,module,exports){
+},{}],103:[function(require,module,exports){
+module.exports=require(96)
+},{"/Users/Tyler/Dropbox/Clients/TJCrap/Dev/craft/mc-manager/node_modules/socket.io-client/node_modules/has-binary/node_modules/isarray/index.js":96}],104:[function(require,module,exports){
 /*! JSON v3.2.6 | http://bestiejs.github.io/json3 | Copyright 2012-2013, Kit Cambridge | http://kit.mit-license.org */
 ;(function (window) {
   // Convenience aliases.
@@ -29517,7 +29604,7 @@ module.exports=require(95)
   }
 }(this));
 
-},{}],104:[function(require,module,exports){
+},{}],105:[function(require,module,exports){
 module.exports = toArray
 
 function toArray(list, index) {
@@ -29532,7 +29619,7 @@ function toArray(list, index) {
     return array
 }
 
-},{}],105:[function(require,module,exports){
+},{}],106:[function(require,module,exports){
 (function ( global, factory ) {
 
 	'use strict';
@@ -29677,7 +29764,7 @@ function toArray(list, index) {
 	});
 
 }));
-},{"backbone":16,"temple-mustache":107}],106:[function(require,module,exports){
+},{"backbone":17,"temple-mustache":108}],107:[function(require,module,exports){
 var Temple = require("templejs"),
 	_ = require("underscore"),
 	util = require("./util"),
@@ -29802,7 +29889,7 @@ module.exports = Temple.extend(_.extend(Observe, {
 		return null;
 	},
 
-	// returns a model specified by query
+	// returns an exact model specified by query
 	findModel: function(parts, options) {
 		var val, model, query;
 
@@ -29810,7 +29897,7 @@ module.exports = Temple.extend(_.extend(Observe, {
 
 		if (_.isString(parts)) query = util.parseContextQuery(parts);
 		else if (_.isArray(parts)) query = util.path.split(parts);
-		else parts = [];
+		else query = [];
 
 		// local model
 		if (query.type === "local") {
@@ -29822,13 +29909,17 @@ module.exports = Temple.extend(_.extend(Observe, {
 			model = _.last(this.getModels());
 		}
 
-		// specific parent model
+		// specific parent context
 		else if (query.type === "parent") {
-			var dist = query.distance;
-			query = query.slice(dist);
-			model = this.firstModelWithValue(query, _.extend({}, options, {
-				models: this.getModels().slice(dist)
-			}));
+			var dist = query.distance,
+				ctx = this;
+			
+			while (dist && ctx) {
+				ctx = ctx.parentContext;
+				dist--;
+			}
+
+			if (ctx != null) model = ctx.firstModelWithValue(query, options);
 		}
 
 		// or normal look up
@@ -29841,35 +29932,34 @@ module.exports = Temple.extend(_.extend(Observe, {
 	},
 
 	get: function(parts, options) {
-		var val, model, filters, fmodel, fn;
+		var val, model, filters, fmodel, fn, args;
 
 		options = options || {};
+		args = _.isArray(options.args) ? options.args :
+			options.args != null ? [ options.args ] : [];
 
+		// get all filters
 		if (_.isString(parts)) {
 			filters = parts.split("|");
 			parts = filters.shift();
+		} else {
+			filters = [];
 		}
 		
 		// get the model from the path and return if specified
-		model = this.findModel(parts);
+		model = this.findModel(parts, options);
 		if (model == null) return options.model ? null : void 0;
 		if (options.model) return model;
-
-		// depend on all deep paths
-		model.depend("**");
 		
-		// get the value and process
-		val = model.get([], _.extend({}, options, { depend: false }));
-		if (_.isFunction(val)) val = val.call(this);
+		// get the value
+		val = model.value;
+		if (_.isFunction(val)) val = val.apply(this, args);
 
 		// apply filters
 		while (filters.length) {
-			fmodel = this.findModel(filters.shift());
-			if (fmodel == null) continue;
-
-			fn = fmodel.get();
-			if (_.isFunction(fn)) val = fn.call(this, val);
-			else val = fn;
+			val = this.get(filters.shift(), _.extend({}, options, {
+				args: [ val ].concat(args)
+			}));
 		}
 
 		return val;
@@ -29888,7 +29978,7 @@ module.exports = Temple.extend(_.extend(Observe, {
 			path = [];
 		}
 
-		model = this.findModel(path, { depend: false }) || this.getModel();
+		model = this.findModel(path, { depend: false }) || this.getModel(path);
 		model.set([], value, options);
 
 		return this;
@@ -30021,7 +30111,7 @@ function intersectChange(model, summary) {
 	return summary;
 }
 
-},{"./model":109,"./observe":111,"./plugins":117,"./util":122,"templejs":128,"underscore":131}],107:[function(require,module,exports){
+},{"./model":110,"./observe":112,"./plugins":118,"./util":123,"templejs":129,"underscore":132}],108:[function(require,module,exports){
 (function (process){
 // the current library version
 var VERSION = "1.1.0";
@@ -30050,7 +30140,7 @@ Mustache.Context = require("./context");
 Mustache.Section = require("./section");
 _.extend(Mustache, require("./plugins"));
 }).call(this,require('_process'))
-},{"./context":106,"./m+xml":108,"./model":109,"./mustache":110,"./plugins":117,"./proxy":119,"./section":120,"./util":122,"_process":53,"templejs":128,"underscore":131}],108:[function(require,module,exports){
+},{"./context":107,"./m+xml":109,"./model":110,"./mustache":111,"./plugins":118,"./proxy":120,"./section":121,"./util":123,"_process":54,"templejs":129,"underscore":132}],109:[function(require,module,exports){
 module.exports = (function() {
   /*
    * Generated by PEG.js 0.8.0.
@@ -30104,7 +30194,7 @@ module.exports = (function() {
           "-->",
           { type: "literal", value: "-->", description: "\"-->\"" },
           function(v) {
-          		return { type: NODE_TYPE.COMMENT, value: v.trim() };
+          		return { type: NODE_TYPE.XCOMMENT, value: v.trim() };
           	},
           void 0,
           { type: "any", description: "any character" },
@@ -30204,7 +30294,7 @@ module.exports = (function() {
 
           		switch(m) {
           			case "!":
-          				type = NODE_TYPE.COMMENT;
+          				type = NODE_TYPE.MCOMMENT;
           				break;
 
           			case ">":
@@ -30756,7 +30846,7 @@ module.exports = (function() {
     parse:       parse
   };
 })();
-},{"./":107,"./types":121,"underscore":131}],109:[function(require,module,exports){
+},{"./":108,"./types":122,"underscore":132}],110:[function(require,module,exports){
 var Temple = require("templejs"),
 	_ = require("underscore"),
 	util = require("./util"),
@@ -31019,7 +31109,7 @@ _.extend(Model.prototype, Temple.Events, Observe, {
 	}
 });
 
-},{"./observe":111,"./proxy":119,"./util":122,"templejs":128,"underscore":131}],110:[function(require,module,exports){
+},{"./observe":112,"./proxy":120,"./util":123,"templejs":129,"underscore":132}],111:[function(require,module,exports){
 var Temple = require("templejs"),
 	NODE_TYPE = require("./types"),
 	_ = require("underscore"),
@@ -31275,6 +31365,9 @@ module.exports = Context.extend({
 			case NODE_TYPE.HTML:
 				return new Temple.HTML(template.value);
 
+			case NODE_TYPE.XCOMMENT:
+				return new Temple.Comment(template.value);
+
 			case NODE_TYPE.INTERPOLATOR:
 			case NODE_TYPE.TRIPLE:
 				var node = new Temple[template.type === NODE_TYPE.TRIPLE ? "HTML" : "Text"];
@@ -31287,9 +31380,10 @@ module.exports = Context.extend({
 
 			case NODE_TYPE.INVERTED:
 			case NODE_TYPE.SECTION:
-				return new Section(null, ctx)
+				var section = new Section(null, ctx)
 				.invert(template.type === NODE_TYPE.INVERTED)
-				.mount(template.value, function(key) {
+				.setPath(template.value)
+				.onRow(function(key) {
 					this.addModel(new Model({ $key: key }));
 					
 					var toMount, bindings;
@@ -31299,13 +31393,13 @@ module.exports = Context.extend({
 					return bindings;
 				});
 
+				toMount.push(section);
+				return section;
+
 			case NODE_TYPE.PARTIAL:
 				var partial = this.renderPartial(template.value, ctx);
-				toMount.push(partial);
+				if (partial != null) toMount.push(partial);
 				return partial;
-
-			default:
-				console.log(template);
 		}
 	},
 
@@ -31330,16 +31424,14 @@ module.exports = Context.extend({
 			case NODE_TYPE.INVERTED:
 				var inverted = template.type === NODE_TYPE.INVERTED,
 					path = template.value,
-					omodel, model, val, isEmpty, makeRow, strval;
+					model, val, isEmpty, makeRow, strval;
 
-				omodel = ctx.findModel(path) || ctx.getModel();
-				val = omodel.get();
-				if (_.isFunction(val)) val = val.call(ctx);
-				isEmpty = Section.isEmpty(val);
-
+				val = ctx.get(path);
 				model = new Model(val);
-				omodel.getAllProxies().reverse().forEach(model.registerProxy, model);
-				if (model.proxy("isArray")) this.depend("length");
+				ctx.getAllProxies().reverse().forEach(model.registerProxy, model);
+
+				isEmpty = Section.isEmpty(model);
+				if (model.proxy("isArray")) model.depend("length");
 
 				makeRow = function(i) {
 					var row, m;
@@ -31368,9 +31460,6 @@ module.exports = Context.extend({
 
 				model.cleanProxyTree();
 				return strval;
-
-			default:
-				console.log(template);
 		}
 	},
 
@@ -31380,7 +31469,7 @@ module.exports = Context.extend({
 
 		if (_.isArray(arg)) return arg.map(function(a) {
 			return temple.convertArgumentTemplate(a, ctx);
-		}).filter(function(a) { return a != null; });
+		});
 
 		switch(arg.type) {
 			case NODE_TYPE.INTERPOLATOR:
@@ -31388,9 +31477,6 @@ module.exports = Context.extend({
 
 			case NODE_TYPE.LITERAL:
 				return arg.value;
-
-			default:
-				console.log(arg);
 		}
 	},
 
@@ -31464,7 +31550,7 @@ module.exports = Context.extend({
 	}
 });
 
-},{"./context":106,"./m+xml":108,"./model":109,"./section":120,"./types":121,"./util":122,"templejs":128,"underscore":131}],111:[function(require,module,exports){
+},{"./context":107,"./m+xml":109,"./model":110,"./section":121,"./types":122,"./util":123,"templejs":129,"underscore":132}],112:[function(require,module,exports){
 var _ = require("underscore"),
 	Temple = require("templejs"),
 	util = require("./util");
@@ -31550,7 +31636,7 @@ module.exports = {
 	}
 }
 
-},{"./util":122,"templejs":128,"underscore":131}],112:[function(require,module,exports){
+},{"./util":123,"templejs":129,"underscore":132}],113:[function(require,module,exports){
 var _ = require("underscore"),
 	Mustache = require("../");
 
@@ -31723,7 +31809,7 @@ function fireAction(action) {
 	
 	return this;
 }
-},{"../":107,"underscore":131}],113:[function(require,module,exports){
+},{"../":108,"underscore":132}],114:[function(require,module,exports){
 (function (process){
 /* Copyright (c) 2012-2013 Brian Cavalier */
 (function(define, global) {
@@ -31938,7 +32024,7 @@ define(function() {
 });
 })(typeof define === 'function' && define.amd ? define : function(factory) { module.exports = factory(); }, this);
 }).call(this,require('_process'))
-},{"_process":53}],114:[function(require,module,exports){
+},{"_process":54}],115:[function(require,module,exports){
 // --------------------------------------------------
 // easing.js v0.5.4
 // Generic set of easing functions with AMD support
@@ -32133,7 +32219,7 @@ define(function() {
     return Math.pow(pos,0.25);
   }
 }));
-},{}],115:[function(require,module,exports){
+},{}],116:[function(require,module,exports){
 var _ = require("underscore"),
 	easing = require("./easing"),
 	Promise = require("./avow"),
@@ -32317,7 +32403,7 @@ Animation.prototype.then = function(success, fail) {
 
 	.then(success, fail);
 }
-},{"../../":107,"./avow":113,"./easing":114,"underscore":131}],116:[function(require,module,exports){
+},{"../../":108,"./avow":114,"./easing":115,"underscore":132}],117:[function(require,module,exports){
 var _ = require("underscore");
 
 module.exports = function(options) {
@@ -32369,9 +32455,14 @@ function toggle(path) {
 	return this.set(path, !this.get(path, { depend: false }));
 }
 
-function expire(path, ttl, fn) {
+function expire(path, ttl, val, fn) {
 	var self = this;
 	if (this._ttl == null) this._ttl = {};
+
+	if (_.isFunction(val) && fn == null) {
+		fn = val;
+		val = void 0;
+	}
 
 	// clear existing ttl
 	if (_.has(this._ttl, path)) {
@@ -32384,14 +32475,15 @@ function expire(path, ttl, fn) {
 
 	// set the timeout
 	this._ttl[path] = setTimeout(function() {
-		self.unset(path);
+		if (_.isUndefined(val)) self.unset(path);
+		else self.set(path, val);
 		delete self._ttl[path];
-		if (_.isFunction(fn)) fn.call(self, path);
+		if (_.isFunction(fn)) fn.call(self, path, val);
 	}, ttl);
 
 	return this;
 }
-},{"underscore":131}],117:[function(require,module,exports){
+},{"underscore":132}],118:[function(require,module,exports){
 var _ = require("underscore"),
 	Mustache = require("../");
 
@@ -32447,7 +32539,7 @@ registerPlugin("actions", require("./actions"));
 registerPlugin("animate", require("./animate"));
 registerPlugin("twoway", require("./twoway"));
 registerPlugin("extras", require("./extras"));
-},{"../":107,"./actions":112,"./animate":115,"./extras":116,"./twoway":118,"underscore":131}],118:[function(require,module,exports){
+},{"../":108,"./actions":113,"./animate":116,"./extras":117,"./twoway":119,"underscore":132}],119:[function(require,module,exports){
 var _ = require("underscore"),
 	Mustache = require("../");
 
@@ -32599,7 +32691,7 @@ function getType(el) {
 			return "text";
 	}
 }
-},{"../":107,"underscore":131}],119:[function(require,module,exports){
+},{"../":108,"underscore":132}],120:[function(require,module,exports){
 require("observe-js");
 
 var Temple = require("templejs"),
@@ -32634,7 +32726,7 @@ Proxy.Object = Proxy.extend({
 		this.model = model;
 
 		(this._observer = new ObjectObserver(target)).open(function(added, removed, changed) {
-			_.flatten([ added, changed ].map(Object.keys)).forEach(function(key) {
+			_.flatten([ added, changed ].map(_.keys)).forEach(function(key) {
 				model.set(key, target[key]);
 			});
 
@@ -32737,7 +32829,7 @@ Proxy.Array = ObjectProxy.extend({
 	}
 });
 
-},{"./util":122,"observe-js":123,"templejs":128,"underscore":131}],120:[function(require,module,exports){
+},{"./util":123,"observe-js":124,"templejs":129,"underscore":132}],121:[function(require,module,exports){
 var _ = require("underscore"),
 	Temple = require("templejs"),
 	util = require("./util"),
@@ -32761,20 +32853,35 @@ module.exports = Context.extend({
 		return !!this._inverted;
 	},
 
-	addRow: function(key, row) {
-		if (!Context.isContext(row))
-			throw new Error("Rows can only be instances of Context.");
+	setPath: function(path) {
+		this._path = path;
+		return this;
+	},
 
+	onRow: function(fn) {
+		if (!_.isFunction(fn))
+			throw new Error("Expecting function for row handler.");
+
+		this._onRow = fn;
+		return this;
+	},
+
+	addRow: function(key, model) {
+		// remove existing
 		this.removeRow(key);
+
+		// add new row
+		var row = new Context(model, this.parentContext || this);
+		row.render = this._onRow;
 		this.rows[key] = row;
 		this.appendChild(row);
 		row.mount(key);
 
-		return this;
+		return row;
 	},
 
 	hasRow: function(key) {
-		return this.getRow() != null;
+		return this.getRow(key) != null;
 	},
 
 	getRow: function(key) {
@@ -32785,7 +32892,7 @@ module.exports = Context.extend({
 		if (this.rows[key] == null) return this;
 
 		var row = this.rows[key];
-		row.stop();
+		row.clean();
 		this.removeChild(row);
 		delete this.rows[key];
 
@@ -32797,36 +32904,31 @@ module.exports = Context.extend({
 		return this;
 	},
 
-	render: function(path, onRow) {
-		var self = this,
-			omodel, val, isEmpty, inverted, observer,
-			rowSort, model, createRow;
+	render: function() {
+		if (this._path == null) throw new Error("Missing path.");
 
-		omodel = this.findModel(path);
-		val = omodel.get();
-		if (_.isFunction(val)) val = val.call(this);
-		isEmpty = Section.isEmpty(val);
-		inverted = this.isInverted();
+		var self = this,
+			val, isEmpty, inverted, observer,
+			rowSort, model, ctx;
+
+		ctx = this.parentContext || this;
+		val = ctx.get(this._path);
 
 		model = new Model(val);
-		omodel.getAllProxies().reverse().forEach(model.registerProxy, model);
-
-		createRow = _.bind(function(model, key) {
-			var row = new Context(model, this);
-			row.render = onRow;
-			this.addRow(key, row);
-			return row;
-		}, this);
+		ctx.getAllProxies().reverse().forEach(model.registerProxy, model);
+		
+		isEmpty = Section.isEmpty(model);
+		inverted = this.isInverted();
 
 		if (isEmpty && inverted) {
 			if (model.proxy("isArray")) model.depend("length");
-			createRow(model, 0);
+			this.addRow(0, model);
 		} else if (!isEmpty && !inverted) {
 			if (model.proxy("isArray")) {
 				// create rows
 				model.keys().forEach(function(key) {
-					createRow(model.getModel(key), key);
-				});
+					this.addRow(key, model.getModel(key));
+				}, this);
 
 				// a reactive context that continuously sorts rows
 				rowSort = this.autorun(function() {
@@ -32846,13 +32948,13 @@ module.exports = Context.extend({
 					if (key == null) return;
 
 					if (s.type === "delete") self.removeRow(key);
-					else if (!self.hasRow(key) && _.contains(model.keys(), key)) createRow(s.model, key);
+					else if (!self.hasRow(key) && _.contains(model.keys(), key)) self.addRow(key, s.model);
 					else return;
 
 					rowSort.invalidate();
 				});
 			} else {
-				createRow(model, 0);
+				this.addRow(0, model);
 			}
 		} else if (model.proxy("isArray")) {
 			model.depend("length");
@@ -32861,17 +32963,17 @@ module.exports = Context.extend({
 		// auto clean
 		this.once("invalidate", function() {
 			this.removeAllRows();
+			if (observer != null) model.stopObserving(observer);
 			model.cleanProxyTree();
-			if (observer != null) this.stopObserving(observer);
 		});
 	}
 }, {
-	isEmpty: function(val) {
-		return !val || (_.isArray(val) && !val.length);
+	isEmpty: function(model) {
+		return !model.value || (model.proxy("isArray") && !model.get("length"));
 	}
 });
 
-},{"./context":106,"./model":109,"./util":122,"templejs":128,"underscore":131}],121:[function(require,module,exports){
+},{"./context":107,"./model":110,"./util":123,"templejs":129,"underscore":132}],122:[function(require,module,exports){
 module.exports = {
 	ROOT              : 1,
 
@@ -32880,20 +32982,21 @@ module.exports = {
 	TEXT              : 3,
 	ELEMENT           : 4,
 	ATTRIBUTE         : 5,
+	XCOMMENT          : 6,
 
 	// Mustache
-	INTERPOLATOR      : 6,
-	TRIPLE            : 7,
-	SECTION           : 8,
-	INVERTED          : 9,
-	PARTIAL           : 10,
+	INTERPOLATOR      : 7,
+	TRIPLE            : 8,
+	SECTION           : 9,
+	INVERTED          : 10,
+	PARTIAL           : 11,
+	MCOMMENT          : 12,
 
 	// MISC
-	COMMENT           : 11,
-	LITERAL           : 12
+	LITERAL           : 13
 }
 
-},{}],122:[function(require,module,exports){
+},{}],123:[function(require,module,exports){
 var _ = require("underscore");
 
 // tests value as pojo (plain old javascript object)
@@ -33210,7 +33313,7 @@ exports.decodeEntities = (function() {
 	}
 })();
 
-},{"underscore":131}],123:[function(require,module,exports){
+},{"underscore":132}],124:[function(require,module,exports){
 (function (global){
 // Copyright 2012 Google Inc.
 //
@@ -34941,7 +35044,7 @@ exports.decodeEntities = (function() {
 })(typeof global !== 'undefined' && global && typeof module !== 'undefined' && module ? global : this || window);
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],124:[function(require,module,exports){
+},{}],125:[function(require,module,exports){
 var Events = require("./events"),
 	Deps = require("./deps"),
 	util = require("./util");
@@ -35040,6 +35143,11 @@ util.extend(Binding.prototype, Events, {
 
 	appendChild: function(child) {
 		return this.insertBefore(child);
+	},
+
+	append: function() {
+		util.flatten(util.toArray(arguments)).forEach(this.appendChild, this);
+		return this;
 	},
 
 	removeChild: function(child) {
@@ -35230,6 +35338,7 @@ util.extend(Binding.prototype, Events, {
 		this.trigger("mount:before", args);
 
 		// the autorun computation
+		this._mounting = true;
 		comp = this._comp = this.autorun(function(comp) {
 			// only render event without bindings
 			this.trigger("render:before", comp, args);
@@ -35271,6 +35380,8 @@ util.extend(Binding.prototype, Events, {
 
 		// remaining mount events happen after the first render
 		this.trigger("mount", comp, args);
+		delete this._mounting;
+
 		this.trigger("mount:after", comp, args);
 
 		return this;
@@ -35279,7 +35390,11 @@ util.extend(Binding.prototype, Events, {
 	render: function(){},
 
 	isMounted: function() {
-		return this._comp != null;
+		return this._comp != null && !this._mounting;
+	},
+
+	isMounting: function() {
+		return this._comp != null && this._mounting;
 	},
 
 	getComputation: function() {
@@ -35287,12 +35402,12 @@ util.extend(Binding.prototype, Events, {
 	},
 
 	invalidate: function() {
-		if (this.isMounted()) this._comp.invalidate();
+		if (this._comp != null) this._comp.invalidate();
 		return this;
 	},
 
 	stop: function() {
-		if (this.isMounted()) this._comp.stop();
+		if (this._comp != null) this._comp.stop();
 		return this;
 	},
 
@@ -35323,7 +35438,7 @@ Binding.prototype.toHTML = Binding.prototype.toString;
 // Load the bindings
 util.extend(Binding, require("./node"));
 Binding.HTML = require("./html");
-},{"./deps":125,"./events":126,"./html":127,"./node":129,"./util":130}],125:[function(require,module,exports){
+},{"./deps":126,"./events":127,"./html":128,"./node":130,"./util":131}],126:[function(require,module,exports){
 // Copy of https://github.com/meteor/meteor/commits/e78861b7d0dbb60e5e2bf59bab2cb06ce6596c04/packages/deps/deps.js
 // (c) 2011-2014 Meteor Development Group
 
@@ -35716,7 +35831,7 @@ Deps.afterFlush = function (f, ctx) {
   afterFlushCallbacks.push(f);
   requireFlush();
 };
-},{}],126:[function(require,module,exports){
+},{}],127:[function(require,module,exports){
 var util = require("./util");
 
 // Backbone.Events
@@ -35902,7 +36017,7 @@ function once(func) {
 		return memo;
 	}
 }
-},{"./util":130}],127:[function(require,module,exports){
+},{"./util":131}],128:[function(require,module,exports){
 var Binding = require("./binding"),
 	util = require("./util");
 
@@ -36016,7 +36131,7 @@ module.exports = Binding.extend({
 	}
 });
 
-},{"./binding":124,"./util":130}],128:[function(require,module,exports){
+},{"./binding":125,"./util":131}],129:[function(require,module,exports){
 var Binding = require("./binding"),
 	util = require("./util");
 
@@ -36028,7 +36143,7 @@ module.exports = Binding.extend({
 		this.initialize.apply(this, arguments);
 	},
 	initialize: function() {
-		util.toArray(arguments).forEach(this.appendChild, this);
+		this.append(util.toArray(arguments));
 	}
 });
 
@@ -36043,7 +36158,7 @@ var Deps = Temple.Deps = require("./deps");
 Temple.autorun = Deps.autorun;
 Temple.nonreactive = Deps.nonreactive;
 Temple.Dependency = Deps.Dependency;
-},{"./binding":124,"./deps":125,"./events":126,"./util":130}],129:[function(require,module,exports){
+},{"./binding":125,"./deps":126,"./events":127,"./util":131}],130:[function(require,module,exports){
 var Binding = require("./binding"),
 	util = require("./util");
 
@@ -36113,6 +36228,40 @@ exports.Text = Node.extend({
 	}
 });
 
+var Comment =
+exports.Comment = Node.extend({
+	constructor: function(nodeOrValue) {
+		// comment node
+		if (nodeOrValue instanceof window.Node && nodeOrValue.nodeType === 8) {
+			this.node = nodeOrValue;
+			this.value = nodeOrValue.nodeValue;
+		}
+
+		// anything else
+		else {
+			this.node = document.createComment("");
+			this.setValue(nodeOrValue);
+		}
+
+		Node.call(this);
+	},
+
+	insertBefore: function() {
+		throw new Error("Comment bindings can't have children.");
+	},
+
+	setValue: function(value) {
+		value = value != null ? value.toString() : "";
+		if (value !== this.node.nodeValue) this.node.nodeValue = value;
+		this.value = value;
+		return this;
+	},
+
+	toString: function() {
+		return this.node.nodeValue;
+	}
+});
+
 var Element =
 exports.Element = Node.extend({
 	constructor: function(nodeOrTagName) {
@@ -36125,7 +36274,7 @@ exports.Element = Node.extend({
 
 			// add child nodes as further children
 			// note: this may affect the original node's children
-			wrapNode(util.toArray(nodeOrTagName.childNodes))
+			fromNode(util.toArray(nodeOrTagName.childNodes))
 				.forEach(function(b) { children.push(b); });
 		}
 
@@ -36277,10 +36426,10 @@ exports.DOM = {};
 });
 
 // converts dom nodes into binding equivalents
-var wrapNode =
-exports.wrapNode = function(node) {
+var fromNode =
+exports.fromNode = function(node) {
 	if (Array.isArray(node)) {
-		return node.map(wrapNode)
+		return node.map(fromNode)
 			.filter(function(b) { return b != null; });
 	}
 
@@ -36290,12 +36439,15 @@ exports.wrapNode = function(node) {
 		
 		// Text Node
 		case 3: return new Text(node);
+		
+		// Comment Node
+		case 8: return new Comment(node);
 
 		// Document Fragment
 		case 11:
 			var binding = new Binding;
 
-			wrapNode(util.toArray(node.childNodes))
+			fromNode(util.toArray(node.childNodes))
 				.forEach(binding.appendChild, binding);
 
 			return binding;
@@ -36303,18 +36455,18 @@ exports.wrapNode = function(node) {
 }
 
 // converts a string of HTML into a set of static bindings
-exports.parseHTML = function(html) {
+exports.fromHTML = function(html) {
 	var cont = document.createElement("div"),
 		binding = new Binding;
 
 	cont.innerHTML = html;
 
-	wrapNode(util.toArray(cont.childNodes))
+	fromNode(util.toArray(cont.childNodes))
 		.forEach(binding.appendChild, binding);
 
 	return binding;
 }
-},{"./binding":124,"./util":130}],130:[function(require,module,exports){
+},{"./binding":125,"./util":131}],131:[function(require,module,exports){
 var toArray =
 exports.toArray = function(obj) {
 	return Array.prototype.slice.call(obj, 0);
@@ -36521,7 +36673,7 @@ exports.runIfExists = function(obj, method) {
 		}
 	}
 }
-},{"./deps":125}],131:[function(require,module,exports){
+},{"./deps":126}],132:[function(require,module,exports){
 //     Underscore.js 1.7.0
 //     http://underscorejs.org
 //     (c) 2009-2014 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors

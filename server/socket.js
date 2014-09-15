@@ -3,9 +3,12 @@ var _ = require("underscore"),
 	fs = require("fs"),
 	Promise = require("bluebird"),
 	IONamespace = require('socket.io/lib/namespace'),
-	expect = require("expect.js");
+	expect = require("expect.js"),
+	crypto = require("crypto");
 
 function noop(){}
+
+var instanceId = crypto.randomBytes(12).toString("hex");
 
 // the socket.io server
 var io =
@@ -14,7 +17,29 @@ module.exports = require('socket.io').listen($server, {
 });
 
 // general API
-var propsAPI = clientAPI()
+var router = createSocketRouter()
+.on("server:id", function(done) {
+	done(null, instanceId);
+})
+.on("signin", function(password, done) {
+	var pass = $env.props.get("server").get("password");
+	done(null, this.socket.signedin = pass == null || password === pass);
+})
+.on("signout", function(done) {
+	delete this.socket.signedin;
+	done(null);
+})
+.on("signedin", function(done) {
+	done(null, this.socket.signedin || false);
+})
+.use(function(req, next) {
+	if (!req.socket.signedin) return next();
+	secureRouter(req, next);
+})
+.connect(io.sockets);
+
+// password protected routes
+var secureRouter = createSocketRouter()
 .on("accept-eula", function(done) {
 	$env.acceptEULA().nodeify(done);
 })
@@ -38,8 +63,7 @@ var propsAPI = clientAPI()
 
 	expect(data).to.be.an("object");
 	prop.set(data).save().return(prop.toJSON()).nodeify(done);
-})
-.connect(io.sockets);
+});
 
 // on server load, integrate
 $env.on("load", function(craft) {
@@ -54,99 +78,138 @@ $env.on("load", function(craft) {
 	});
 
 	[ "version", "join", "leave", "data", "line", "eula" ].forEach(function(event) {
-		var emit = io.sockets.emit.bind(io.sockets, "server:" + event);
-		craft.on(event, emit);
+		craft.on(event, function() {
+			var args = _.toArray(arguments);
+			args.unshift("server:" + event);
+
+			io.sockets.forEach(function(socket) {
+				if (socket.signedin) socket.emit.apply(socket, args);
+			});
+		});
 	});
 
-	var craftAPI = clientAPI()
-	.on("server:state", function(fn) {
-		fn(null, craft.state);
+	router.on("server:state", function(done) {
+		done(null, craft.state);
+	});
+
+	var craftAPI = createSocketRouter()
+	.attach(secureRouter)
+	.on("server:start", function(done) {
+		$env.start().nodeify(done);
 	})
-	.on("server:start", function(fn) {
-		$env.start().nodeify(fn);
-	})
-	.on("server:stop", function(sec, fn) {
-		if (_.isFunction(sec) && fn == null) {
-			fn = sec;
+	.on("server:stop", function(sec, done) {
+		if (_.isFunction(sec) && done == null) {
+			done = sec;
 			sec = 0;
 		}
 
-		$env.stop(sec).nodeify(fn);
+		$env.stop(sec).nodeify(done);
 	})
-	.on("server:restart", function(sec, fn) {
-		$env.stop().delay(1000).then($env.start).nodeify(fn);
+	.on("server:restart", function(sec, done) {
+		$env.stop().delay(1000).then($env.start).nodeify(done);
 	})
 	.on("server:command", function() {
 		var args = _.toArray(arguments);
 		done = args.pop();
 		craft.command(args);
 		done();
-	})
-	.connect(io.sockets);
+	});
 
 	// next unload is this server instance
 	$env.once("unload", function() {
-		craftAPI.disconnect();
+		secureRouter.remove(craftAPI);
 	});
 });
 
-function clientAPI() {
+function createSocketRouter() {
 	var api,
 		open = {},
-		methods = [];
+		middleware = [];
 
-	return api = {
-		on: function(name, fn) {
-			methods.push([ name, function() {
-				var args, done;
+	function socketEvent(payload, done) {
+		if (!_.isObject(payload)) return;
+		if (!_.isFunction(done)) done = noop;
+		payload.socket = this;
+		router.call(this, payload, done);
+	}
 
-				try {
-					args = _.toArray(arguments);
-					done = noop;
-					if (_.isFunction(_.last(args))) done = args.pop();
+	function router(payload, done) {
+		var methods, next, self;
 
-					args.push(function(err) {
-						var args = _.toArray(arguments).slice(1);
-						args.unshift(err != null ? err.toString() : null);
-						done.apply(this, args);
-					});
+		methods = middleware.slice(0);
+		self = this;
 
-					fn.apply(this, args);
-				} catch(e) {
-					done(e.toString());
-					console.error(e.stack);
+		(next = function() {
+			var args = _.toArray(arguments);
+
+			if (args.length || !methods.length) {
+				if (args[0] instanceof Error) {
+					if (_.isString(args[0].message)) args[0] = args[0].message;
+					else args[0] = args[0].toString();
 				}
-			} ]);
 
-			return api;
+				return done.apply(self, args);
+			}
+
+			try {
+				methods.shift().call(self, payload, next);
+			} catch(e) {
+				next(e);
+			}
+		})();
+	}
+
+	_.extend(router, {
+		use: function(fn) {
+			middleware.push(fn);
+			return router;
+		},
+
+		remove: function(fn) {
+			middleware = _.without(middleware, fn);
+			return router;
+		},
+
+		on: function(name, fn) {
+			router.use(function(req, next) {
+				if (req.name !== name) return next();
+				var args = _.isArray(req.args) ? req.args : [];
+				fn.apply(req, args.concat(next));
+			});
+
+			return router;
+		},
+
+		attach: function(r) {
+			r.use(router);
+			return router;
 		},
 
 		connect: function(socket) {
 			if (socket instanceof IONamespace) {
-				_.each(socket.sockets, api.connect);
-				socket.on('connection', api.connect);
-				return api;
+				_.each(socket.sockets, router.connect);
+				socket.on('connection', router.connect);
+				return router;
 			}
 
-			api.disconnect(socket);
+			router.disconnect(socket);
 
-			var fns = methods.slice(0);
-			fns.forEach(function(m) { socket.on(m[0], m[1]); });
-			socket.on("disconnect", open[socket.id] = clean);
-
-			function clean() {
-				fns.forEach(function(m) { socket.removeListener(m[0], m[1]); });
-				socket.removeListener("disconnect", clean);
+			socket.on("req", socketEvent);
+			socket.on("disconnect", open[socket.id] = function() {
+				socket.removeListener("req", socketEvent);
+				socket.removeListener("disconnect", open[socket.id]);
 				delete open[socket.id];
-			}
+			});
 
-			return api;
+			return router;
 		},
 
 		disconnect: function(socket) {
-			if (socket == null) open.forEach(function(fn) { fn(); });
+			if (socket == null) _.keys(open).forEach(function(id) { open[id](); });
 			else if (open[socket.id]) open[socket.id]();
-			return api;
+			return router;
 		}
-	}
+	});
+
+	return router;
 }

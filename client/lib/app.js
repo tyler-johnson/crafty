@@ -9,6 +9,7 @@ module.exports = Backbone.Router.extend({
 	initialize: function() {
 		this.state = "init";
 		this.initTime = new Date; // date cache for the *rough* time of launch
+		this.storage = util.storage(this.name);
 
 		this._routeDep = new Mustache.Dependency;
 		this.on("route", function() { this._routeDep.changed(); });

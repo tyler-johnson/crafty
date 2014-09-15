@@ -7,7 +7,7 @@
 	},
 	"scripts": {
 		"start": "./bin/crafty -p 80 > out.log 2>&1 &",
-		"dev": "nodemon -e js,html -w lib/ -w server/ --exec \"./bin/crafty minecraft\"",
+		"dev": "nodemon -e js,html -w lib/ -w server/ -w public/ --exec \"./bin/crafty minecraft\"",
 		"build": "node fez.js -c && nodemon -e js,html,json,coffee -w client/ -w lib/ fez.js"
 	},
 	"bin": {

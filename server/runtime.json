@@ -47,6 +47,7 @@
 		"file": "crafty.json",
 		"default": {
 			"name": "A Minecraft Server",
+			"password": null,
 			"version": null
 		}
 	}

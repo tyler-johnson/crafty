@@ -38,14 +38,14 @@ function sync(method, model, options) {
 		switch(method) {
 			case "read":
 				if (model instanceof Prop) id = model.id;
-				return util.asyncSocketEvent(socket, "props:read", id)
+				return socket.call("props:read", id)
 
 			case "create":
 				throw new Error("Cannot create.");
 
 			case "update":
 				id = model.id;
-				return util.asyncSocketEvent(socket, "props:write", id, model.toJSON());
+				return socket.call("props:write", id, model.toJSON());
 
 			case "delete":
 				throw new Error("Can't delete properties from the browser.");

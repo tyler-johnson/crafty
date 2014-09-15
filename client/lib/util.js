@@ -1,22 +1,4 @@
-var _ = require("underscore"),
-	Promise = require("bluebird");
-
-exports.asyncSocketEvent = function(socket, event) {
-	var args = _.toArray(arguments).slice(1);
-	
-	return new Promise(function(resolve, reject) {
-		args.push(function(err) {
-			if (err) return reject(err);
-			
-			var args = _.toArray(arguments).slice(1),
-				len = args.length;
-
-			resolve(!len ? void 0 : len === 1 ? args[0] : args);
-		});
-
-		socket.emit.apply(socket, args);
-	});
-}
+var _ = require("underscore");
 
 exports.which = function(e) {
 	e = e || window.event;
@@ -25,16 +7,32 @@ exports.which = function(e) {
 		: e.which;
 }
 
-var stor =
-exports.storage = {
-	supported: window.localStorage != null,
-	get: function(key) {
-		if (!stor.supported) return;
-		var raw = window.localStorage[key];
-		return raw != null ? JSON.parse(raw) : void 0;
-	},
-	set: function(key, value) {
-		if (!stor.supported) return;
-		window.localStorage[key] = JSON.stringify(value);
+var Storage =
+exports.storage = function(namespace) {
+	var stor;
+
+	return stor = {
+		namespace: namespace,
+		key: function(k) {
+			return (_.isEmpty(stor.namespace) ? "" : stor.namespace + ":") + k;
+		},
+		get: function(k) {
+			try {
+				if (!Storage.supported) return;
+				return JSON.parse(atob(window.localStorage[stor.key(k)]));
+			} catch(e) {
+				return void 0;
+			}
+		},
+		set: function(k, value) {
+			if (!Storage.supported) return;
+			window.localStorage[stor.key(k)] = btoa(JSON.stringify(value));
+		},
+		clear: function(k) {
+			if (!Storage.supported) return;
+			delete window.localStorage[stor.key(k)];
+		}
 	}
 }
+
+exports.storage.supported = window.localStorage != null;
