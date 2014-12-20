@@ -1,7 +1,6 @@
 var convict = require("convict");
 
-// Convict Schema
-module.exports = convict({
+var schema = {
 	env: {
 		doc: "Node environment.",
 		format: [ "development", "production" ],
@@ -19,5 +18,18 @@ module.exports = convict({
 		format: String,
 		default: process.cwd(),
 		env: "CRAFTY_PATH"
+	},
+	settings: {
+		doc: "Minecraft server settings.",
+		format: String,
+		default: null,
+		env: "CRAFTY_SETTINGS"
 	}
-});
+};
+
+module.exports = function(base) {
+	var config = convict(schema);
+	if (typeof base === "string" || Array.isArray(base)) config.loadFile(base);
+	else if (base != null) config.load(base);
+	return config;
+}

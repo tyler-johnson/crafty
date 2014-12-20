@@ -1,47 +1,14 @@
 {
-	"name": "crafty",
-	"version": "0.2.0",
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/appleifreak/crafty.git"
-	},
-	"scripts": {
-		"start": "./bin/crafty -p 80 > out.log 2>&1 &",
-		"dev": "nodemon -e js,html -w lib/ -w server/ -w public/ --exec \"./bin/crafty minecraft\"",
-		"build": "node fez.js -c && nodemon -e js,html,json,coffee -w client/ -w lib/ fez.js"
-	},
-	"bin": {
-		"crafty": "./bin/crafty"
-	},
-	"dependencies": {
-		"backbone": "~1.1.2",
-		"bluebird": "~2.3.2",
-		"compression": "~1.0.11",
-		"convict": "~0.4.2",
-		"express": "~4.8.8",
-		"expect.js": "~0.3.1",
-		"jquery": "~2.1.1",
-		"less-middleware": "~1.0.4",
-		"minimist": "~1.1.0",
-		"mkdirp": "~0.5.0",
-		"moment": "~2.8.3",
-		"morgan": "~1.3.0",
-		"nbt": "~0.3.0",
-		"properties-parser": "~0.2.3",
-		"serve-static": "~1.5.4",
-		"socket.io": "~1.1.0",
-		"socket.io-client": "~1.1.0",
-		"temple-backbone": "~1.1.0",
-		"temple-mustache": "~1.0.0",
-		"underscore": "~1.7.0"
-	},
-	"devDependencies": {
-		"coffeeify": "~0.7.0",
-		"grunt": "~0.4.5",
-		"grunt-browserify": "~3.0.1",
-		"grunt-contrib-uglify": "~0.5.1",
-		"grunt-contrib-watch": "~0.6.1",
-		"grunt-exorcise": "~0.1.0",
-		"through": "~2.3.4"
-	}
+  "main": "./src/index.js",
+  "dependencies": {
+    "bluebird": "^2.4.0",
+    "convict": "^0.6.0",
+    "js-yaml": "^3.2.3",
+    "minimist": "^1.1.0",
+    "mkdirp": "^0.5.0",
+    "moment": "^2.8.4",
+    "properties-parser": "^0.2.3",
+    "rimraf": "^2.2.8",
+    "underscore": "^1.7.0"
+  }
 }
