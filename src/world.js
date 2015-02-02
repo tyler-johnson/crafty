@@ -1,8 +1,9 @@
-var EventEmitter = require("events").EventEmitter;
+var Events = require("backbone").Events;
 
 function World() {
 
 }
 
 exports.World = World;
-World.prototype = Object.create(EventEmitter.prototype);
+
+_.extend(World.prototype, Events);

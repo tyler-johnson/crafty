@@ -1,5 +1,5 @@
 var _ = require("underscore"),
-	EventEmitter = require("events").EventEmitter,
+	Backbone = require("backbone"),
 	utils = require("./utils");
 
 function Adaptor(manager) {
@@ -7,10 +7,9 @@ function Adaptor(manager) {
 }
 
 module.exports = Adaptor;
-Adaptor.prototype = Object.create(EventEmitter.prototype);
-Adaptor.extend = utils.subclass;
+Adaptor.extend = Backbone.Model.extend;
 
-_.extend(Adaptor.prototype, {
+_.extend(Adaptor.prototype, Backbone.Events, {
 
 	load: function() {},
 	unload: function() {},

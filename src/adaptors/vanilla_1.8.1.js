@@ -7,7 +7,8 @@ var _ = require("underscore"),
 	https = require("https"),
 	fs = Promise.promisifyAll(require("fs")),
 	exec = require("child_process").exec,
-	moment = require('moment');
+	moment = require('moment'),
+	utils = require("./utils");
 
 var JAVA_PATH = "java",
 	PATTERNS = {
@@ -170,7 +171,7 @@ module.exports = Adaptor.extend({
 		if (this.isRunning()) return false;
 
 		this.readyState = "starting";
-		// this.emit("start");
+		this.trigger("start");
 
 		var binPath = this.binaryActivePath(),
 			cmd = Vanilla.command(binPath, this.manager.setting("ram"));
@@ -195,7 +196,7 @@ module.exports = Adaptor.extend({
 		this.players = {};
 
 		// command last to guarantee state order
-		this.emit("stop");
+		this.trigger("stop");
 		this.command("stop");
 		
 		return true;
@@ -229,11 +230,11 @@ module.exports = Adaptor.extend({
 	},
 
 	_onData: function(data) {
-		this.emit("data", data);
+		this.trigger("data", data);
 
 		var line = Vanilla.parseLine(data);
 		if (line == null) return;
-		this.emit("line", line);
+		this.trigger("line", line);
 
 		_.some(PATTERNS, _.bind(function(reg, key) {
 			var m = reg.exec(line.text);
@@ -241,12 +242,12 @@ module.exports = Adaptor.extend({
 			
 			switch(key) {
 				case "version":
-					this.emit("version", m[1]);
+					this.trigger("version", m[1]);
 					break;
 
 				case "done":
 					this.state = "running";
-					this.emit("ready");
+					this.trigger("ready");
 					break;
 
 				case "join":
@@ -263,7 +264,7 @@ module.exports = Adaptor.extend({
 					}
 					
 					this.players[name] = meta;
-					this.emit("join", name, meta);
+					this.trigger("join", name, meta);
 					break;
 
 				case "leave":
@@ -271,11 +272,11 @@ module.exports = Adaptor.extend({
 					break;
 
 				case "bind":
-					this.emit("error", new Error("Failed to bind port."));
+					this.trigger("error", new Error("Failed to bind port."));
 					break;
 
 				case "eula":
-					this.emit("eula");
+					this.trigger("eula");
 			}
 
 			return true;
@@ -284,22 +285,22 @@ module.exports = Adaptor.extend({
 
 	_onError: function(data) {
 		if (/^Error/.test(data) || /^Exception/.test(data)) {
-			this.emit("error", new Error(data));
+			this.trigger("error", new Error(data));
 		} else {
-			this.emit("data", data);
+			this.trigger("data", data);
 		}
 	},
 
 	_onExit: function() {
 		delete this.process;
 		this.state = "stopped";
-		this.emit("exit");
+		this.trigger("exit");
 	},
 
 	_playerLeft: function(name) {
 		if (this.isOnline(name)) {
 			delete this.players[name];
-			this.emit("leave", name);
+			this.trigger("leave", name);
 		}
 	}
 
@@ -374,7 +375,32 @@ module.exports = Adaptor.extend({
 				"generate-structures": true,
 				motd: "A Minecraft Server"
 			}
-		}
+		},
+
+		// banned_ips: {
+		// 	file: "banned-ips.json",
+		// 	default: []
+		// },
+
+		// banned_players: {
+		// 	file: "banned-players.json",
+		// 	default: []
+		// },
+
+		// ops: {
+		// 	file: "ops.json",
+		// 	default: []
+		// },
+
+		// whitelist: {
+		// 	file: "whitelist.json",
+		// 	default: []
+		// },
+
+		// eula: {
+		// 	file: "eula.txt",
+		// 	default: [ "eula=true" ]
+		// }
 	}
 
 

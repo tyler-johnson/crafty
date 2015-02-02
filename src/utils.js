@@ -1,24 +1,19 @@
 var _ = require("underscore");
 
-exports.subclass = function(protoProps, staticProps) {
-	var parent = this;
-	var child;
- 
-	if (protoProps && _.has(protoProps, 'constructor')) {
-	  child = protoProps.constructor;
-	} else {
-	  child = function(){ return parent.apply(this, arguments); };
-	}
- 
-	_.extend(child, parent, staticProps);
- 
-	var Surrogate = function(){ this.constructor = child; };
-	Surrogate.prototype = parent.prototype;
-	child.prototype = new Surrogate;
- 
-	if (protoProps) _.extend(child.prototype, protoProps);
- 
-	child.__super__ = parent.prototype;
+var specialTypes = {
+	regex: _.isRegExp,
+	array: _.isArray,
+	date: _.isDate,
+	nan: _.isNumber,
+	"null": _.isNull
+}
 
-	return child;
-};
+exports.typeof = function(val) {
+	var type;
+
+	_.some(specialTypes, function(fn, t) {
+		if (fn(val)) return type = t;
+	});
+
+	return type != null ? type : typeof(val);
+}

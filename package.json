@@ -1,6 +1,7 @@
 {
   "main": "./src/index.js",
   "dependencies": {
+    "backbone": "^1.1.2",
     "bluebird": "^2.4.0",
     "convict": "^0.6.0",
     "js-yaml": "^3.2.3",

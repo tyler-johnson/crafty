@@ -1,5 +1,5 @@
 var _ = require("underscore"),
-	EventEmitter = require("events").EventEmitter,
+	Events = require("backbone").Events,
 	fs = require("fs"),
 	path = require("path"),
 	files = require("./files"),
@@ -35,7 +35,6 @@ function Manager(dir, settings) {
 }
 
 module.exports = Manager;
-Manager.prototype = Object.create(EventEmitter.prototype);
 
 Manager.BINARY_DIR = "bin";
 Manager.WORLD_DIR = "world";
@@ -58,7 +57,7 @@ function resolvePath() {
 	return path.resolve.apply(path, args);
 }
 
-_.extend(Manager.prototype, {
+_.extend(Manager.prototype, Events, {
 
 	resolvePath: resolvePath,
 	resolveBinaryPath: _.partial(resolvePath, Manager.BINARY_DIR),
@@ -98,6 +97,9 @@ _.extend(Manager.prototype, {
 			// set new active adaptor
 			adaptor = this.active = new ctor(this);
 
+			// listen to all events
+			adaptor.on("all", this._adaptorEvent, this);
+
 			// make new active directory
 			return files.mkdir(this.resolveActivePath());
 		})
@@ -116,6 +118,7 @@ _.extend(Manager.prototype, {
 
 		// clean up
 		.then(function() {
+			this.active.off("all", this._adaptorEvent);
 			delete this.active;
 		});
 	},
@@ -128,6 +131,12 @@ _.extend(Manager.prototype, {
 	stop: function() {
 		if (!this.active) return Promise.bind(this);
 		return Promise.cast(this.active.stop()).bind(this);
+	},
+
+	_adaptorEvent: function(name) {
+		var args = _.toArray(arguments).slice(1);
+		args.unshift("active:" + name);
+		return this.trigger.apply(this, args);
 	}
 
 });

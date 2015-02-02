@@ -31,11 +31,11 @@ module.exports = function(options) {
 	}
 
 	craft.load().then(function() {
-		craft.active.on("data", function(d) {
+		craft.on("active:data", function(d) {
 			console.log(d.trim());
 		});
 
-		craft.active.on("error", function(e) {
+		craft.on("error active:error", function(e) {
 			console.error(e.stack);
 		});
 
